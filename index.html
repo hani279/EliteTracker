@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#0b1426">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ELITE">
+<meta name="description" content="Input & activity tracker for coached sales and real estate agents.">
+<title>ELITE Tracker</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Onboarding renders here when not yet set up -->
+    <div id="onboarding"></div>
+
+    <!-- Main app -->
+    <div id="main" style="display:none">
+      <div id="topbar"></div>
+      <div id="views"></div>
+      <nav id="bottomnav" class="bottomnav"></nav>
+    </div>
+  </div>
+
+  <!-- Bottom sheet / modal host -->
+  <div id="sheet-backdrop" class="sheet-backdrop">
+    <div id="sheet" class="sheet"></div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast"></div>
+
+  <script src="js/store.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/intelligence.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

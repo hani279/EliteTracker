@@ -1,0 +1,606 @@
+/* ============================================================
+   ELITE TRACKER — ui.js
+   Rendering, router, onboarding, all screens, sheets, forms.
+   ============================================================ */
+(function (global) {
+  'use strict';
+  const S = global.Store, Data = global.Data, Intel = global.Intel;
+
+  let current = 'today';       // agent view
+  let coachView = 'dashboard'; // coach view
+  let onbStep = 0;
+  const onbTmp = { vertical: null, name: '', coachName: 'Harry', goal: '', proof: '', steps: ['', '', ''] };
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  // ---------- primitives ----------
+  function ring(pct, label, opt) {
+    opt = opt || {}; const size = opt.size || 64;
+    const r = (size - 8) / 2, c = 2 * Math.PI * r, off = c * (1 - Math.min(pct, 100) / 100);
+    const track = opt.light ? 'rgba(11,20,38,.10)' : 'rgba(255,255,255,.15)';
+    const col = opt.color || 'var(--gold)';
+    return `<div class="ringwrap" style="width:${size}px;height:${size}px">
+      <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+        <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${track}" stroke-width="6"/>
+        <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${col}" stroke-width="6" stroke-linecap="round"
+          stroke-dasharray="${c}" stroke-dashoffset="${off}" transform="rotate(-90 ${size / 2} ${size / 2})"/>
+      </svg><div class="rt"><div class="p" style="${opt.dark ? '' : ''}">${pct}%</div><div class="l">${label || ''}</div></div></div>`;
+  }
+
+  function initials(name) { return (name || '?').split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase(); }
+
+  // ---------- toast ----------
+  let toastT;
+  function toast(msg) {
+    const t = $('toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
+  // ---------- sheet ----------
+  function openSheet(html) {
+    $('sheet').innerHTML = `<div class="grab"></div>` + html;
+    $('sheet-backdrop').classList.add('open');
+  }
+  function closeSheet() { $('sheet-backdrop').classList.remove('open'); }
+
+  /* ============================================================
+     ONBOARDING
+     ============================================================ */
+  function renderOnboarding() {
+    const wrap = $('onboarding');
+    const steps = [stepVertical, stepProfile, stepBuild, stepGoal];
+    wrap.innerHTML = `<div class="onb">
+      <div class="brand"><span class="dia"></span><span class="nm">ELITE</span><span class="tk">TRACKER</span></div>
+      ${steps[onbStep]()}
+      <div class="dots">${steps.map((_, i) => `<span class="d ${i === onbStep ? 'on' : ''}"></span>`).join('')}</div>
+    </div>`;
+  }
+
+  function stepVertical() {
+    return `<h2>Let's set you up</h2>
+      <p class="lead">First — which world are you selling in? This tailors every metric, pipeline stage and report.</p>
+      <button class="choice ${onbTmp.vertical === 'realestate' ? 'on' : ''}" data-act="onb-vert:realestate">
+        <div class="ct">Real Estate</div>
+        <div class="cs">Calls, door knocks, appraisals (BAP / MAP / LAP), listings & sales.</div>
+      </button>
+      <button class="choice ${onbTmp.vertical === 'sales' ? 'on' : ''}" data-act="onb-vert:sales">
+        <div class="ct">Sales — Non-Real-Estate</div>
+        <div class="cs">Calls, social touches, first meetings, deals & pipeline.</div>
+      </button>
+      <div class="step-actions">
+        <button class="btn gold" data-act="onb-next" ${onbTmp.vertical ? '' : 'disabled style="opacity:.5"'}>Continue</button>
+      </div>`;
+  }
+
+  function stepProfile() {
+    return `<h2>Who's tracking?</h2>
+      <p class="lead">So your coach sees who's putting in the work.</p>
+      <div class="card-light">
+        <div class="field"><label>Your name</label>
+          <input class="input" id="onb-name" placeholder="e.g. Jordan Avery" value="${esc(onbTmp.name)}"></div>
+        <div class="field" style="margin-bottom:0"><label>Your coach's name</label>
+          <input class="input" id="onb-coach" placeholder="e.g. Harry" value="${esc(onbTmp.coachName)}"></div>
+      </div>
+      <div class="step-actions">
+        <button class="btn ghost" data-act="onb-back">Back</button>
+        <button class="btn gold" data-act="onb-next">Continue</button>
+      </div>`;
+  }
+
+  function stepBuild() {
+    return `<h2>What did you do?</h2>
+      <p class="lead">Start-up reflection. Where are you now, and what are you building toward?</p>
+      <div class="card-light">
+        <div class="field" style="margin-bottom:0"><label>Recent wins / where you're at</label>
+          <textarea class="textarea" id="onb-did" placeholder="What have you done well lately? What's your current level?">${esc(onbTmp.did || '')}</textarea></div>
+      </div>
+      <div class="step-actions">
+        <button class="btn ghost" data-act="onb-back">Back</button>
+        <button class="btn gold" data-act="onb-next">Continue</button>
+      </div>`;
+  }
+
+  function stepGoal() {
+    return `<h2>Build the best agent</h2>
+      <p class="lead">Your operating framework: the Goal, the Proof it's working, and the Steps to get there.</p>
+      <div class="card-light">
+        <div class="field"><label>Goal — what are you chasing?</label>
+          <input class="input" id="onb-goal" placeholder="e.g. $500K income / #1 in office" value="${esc(onbTmp.goal)}"></div>
+        <div class="field"><label>Proof — how you'll know it's working</label>
+          <input class="input" id="onb-proof" placeholder="e.g. 4 listings a month, 80% BAP→list" value="${esc(onbTmp.proof)}"></div>
+        <div class="field" style="margin-bottom:0"><label>Steps — the daily behaviours</label>
+          <input class="input" style="margin-bottom:8px" id="onb-s0" placeholder="Step 1 — e.g. 20 calls before 11am" value="${esc(onbTmp.steps[0])}">
+          <input class="input" style="margin-bottom:8px" id="onb-s1" placeholder="Step 2 — e.g. 4 door knocks daily" value="${esc(onbTmp.steps[1])}">
+          <input class="input" id="onb-s2" placeholder="Step 3 — e.g. 1 appraisal booked" value="${esc(onbTmp.steps[2])}"></div>
+      </div>
+      <div class="step-actions">
+        <button class="btn ghost" data-act="onb-back">Back</button>
+        <button class="btn gold" data-act="onb-finish">Enter ELITE Tracker</button>
+      </div>`;
+  }
+
+  function captureOnb() {
+    if (onbStep === 1) { onbTmp.name = ($('onb-name') || {}).value || ''; onbTmp.coachName = ($('onb-coach') || {}).value || 'Harry'; }
+    if (onbStep === 2) { onbTmp.did = ($('onb-did') || {}).value || ''; }
+    if (onbStep === 3) {
+      onbTmp.goal = ($('onb-goal') || {}).value || '';
+      onbTmp.proof = ($('onb-proof') || {}).value || '';
+      onbTmp.steps = [($('onb-s0') || {}).value || '', ($('onb-s1') || {}).value || '', ($('onb-s2') || {}).value || ''];
+    }
+  }
+
+  function finishOnboarding() {
+    captureOnb();
+    const s = S.get();
+    s.profile.name = onbTmp.name || 'Agent';
+    s.profile.coachName = onbTmp.coachName || 'Harry';
+    s.buildFramework = { goal: onbTmp.goal, proof: onbTmp.proof, steps: onbTmp.steps.filter(Boolean) };
+    if (onbTmp.did) { const t = S.dayRecord(S.todayKey()); t.summary.did = onbTmp.did; }
+    Data.seedAll(onbTmp.vertical);
+    Data.seedHistory();
+    s.onboarded = true;
+    S.save();
+    $('onboarding').style.display = 'none';
+    $('main').style.display = 'block';
+    render();
+  }
+
+  /* ============================================================
+     TOP BAR + BOTTOM NAV
+     ============================================================ */
+  const AGENT_TITLES = { today: 'Dashboard', track: 'Tracker', pipeline: 'Pipeline', crm: 'CRM', reports: 'Reports', goals: 'Goals' };
+  const COACH_TITLES = { dashboard: 'Coach Dashboard', clients: 'Clients', alerts: 'Alerts' };
+
+  function renderTopbar() {
+    const s = S.get();
+    const title = s.mode === 'coach' ? COACH_TITLES[coachView] : AGENT_TITLES[current];
+    $('topbar').innerHTML = `<div class="topbar">
+      <div>
+        <h1>${title}</h1>
+        <div class="sub">${s.mode === 'coach' ? (s.profile.coachName + ' · Head Coach') : (Data.vertical().label + ' · ' + esc(s.profile.name))}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button class="btn outline sm" data-act="open-menu" aria-label="Menu">☰</button>
+        <div class="mode-toggle">
+          <button class="${s.mode === 'agent' ? 'on' : ''}" data-act="mode:agent">Agent</button>
+          <button class="${s.mode === 'coach' ? 'on' : ''}" data-act="mode:coach">Coach</button>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  function renderNav() {
+    const s = S.get();
+    const nav = $('bottomnav');
+    if (s.mode === 'coach') {
+      const items = [['dashboard', '◧', 'Dashboard'], ['clients', '👥', 'Clients'], ['alerts', '🔔', 'Alerts']];
+      const alertN = (s.demoAlerts || []).filter((a) => a.tone === 'red' || a.tone === 'amber').length;
+      nav.innerHTML = items.map(([k, ic, l]) =>
+        `<button class="${coachView === k ? 'on' : ''}" data-act="cnav:${k}"><span class="ic">${ic}</span>${l}${k === 'alerts' && alertN ? ` <span class="badge">${alertN}</span>` : ''}</button>`).join('');
+    } else {
+      const items = [['today', '◈', 'Today'], ['track', '📊', 'Track'], ['pipeline', '🗂', 'Pipeline'], ['crm', '👤', 'CRM'], ['reports', '📄', 'Reports']];
+      nav.innerHTML = items.map(([k, ic, l]) =>
+        `<button class="${current === k ? 'on' : ''}" data-act="nav:${k}"><span class="ic">${ic}</span>${l}</button>`).join('');
+    }
+  }
+
+  /* ============================================================
+     MAIN RENDER / ROUTER
+     ============================================================ */
+  function render() {
+    const s = S.get();
+    if (!s.onboarded) { $('onboarding').style.display = 'block'; $('main').style.display = 'none'; renderOnboarding(); return; }
+    renderTopbar(); renderNav();
+    const host = $('views');
+    if (s.mode === 'coach') host.innerHTML = coachScreen();
+    else host.innerHTML = agentScreen();
+    window.scrollTo({ top: 0 });
+  }
+
+  function agentScreen() {
+    switch (current) {
+      case 'today': return viewToday();
+      case 'track': return viewTrack();
+      case 'pipeline': return viewPipeline();
+      case 'crm': return viewCRM();
+      case 'reports': return viewReports();
+      case 'goals': return viewGoals();
+      default: return viewToday();
+    }
+  }
+  function coachScreen() {
+    switch (coachView) {
+      case 'dashboard': return coachDashboard();
+      case 'clients': return coachClients();
+      case 'alerts': return coachAlerts();
+      default: return coachDashboard();
+    }
+  }
+
+  /* ============================================================
+     AGENT — TODAY (dashboard: focus, log, coach, summary, predict)
+     ============================================================ */
+  function viewToday() {
+    const s = S.get(); const day = S.dayRecord(S.todayKey());
+    const calls = Intel.callsToday(); const pace = Intel.todayPace(); const st = Intel.streak();
+    const defs = Data.activityDefs();
+    const doneFocus = day.focus.filter((f) => f.done).length;
+    const pred = Intel.predictive();
+
+    return `
+    <section class="screen active">
+      <div class="hero">
+        <h2>${greeting()}, ${esc(s.profile.name.split(' ')[0])}</h2>
+        <div class="meta"><span>${S.fmtDate(S.todayKey())}</span><span>·</span><span class="streak">${st}-day streak</span><span>·</span><span>numbers due ${s.settings.numbersDue}</span></div>
+        <div class="hero-stats">
+          <div class="hero-stat"><div class="k">Today's calls</div><div class="v">${calls.done}/${calls.target}</div></div>
+          <div class="hero-stat"><div class="k">Day pace</div><div class="v gold">${pace}%</div></div>
+          <div class="ring">${ring(pace, 'FOCUS')}</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Today's focus <span class="pill">${doneFocus}/${day.focus.length}</span></h3>
+        ${day.focus.map((f) => `
+          <div class="focus-item ${f.done ? 'done' : ''}" data-act="focus:${f.id}">
+            <div class="check ${f.done ? 'done' : ''}">${f.done ? '✓' : ''}</div>
+            <div class="txt">${esc(f.text)}</div>
+            <div class="time">${esc(f.time || '')}</div>
+          </div>`).join('')}
+        <div class="btn-row" style="margin-top:12px">
+          <button class="btn ghost sm" data-act="add-focus">＋ Add task</button>
+          <button class="btn ${day.reviewedEOD ? 'outline' : 'gold'} sm" data-act="eod-review">${day.reviewedEOD ? '✓ Day reviewed' : 'End-of-day review'}</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Log today's numbers <span class="pill">${Data.vertical().label}</span></h3>
+        ${defs.map((m) => numberRow(m, day)).join('')}
+        <div class="hr"></div>
+        <div class="section-title">Outcomes (tap to add)</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          ${Data.outcomeDefs().map((o) => `<button class="tag ${o.bad ? 'red' : 'gold'}" data-act="outcome:${o.key}">${esc(o.label)} · ${(day.outcomes[o.key] || 0)}</button>`).join('')}
+        </div>
+      </div>
+
+      <div class="card dark">
+        <div class="coach-msg">
+          <div class="avatar">${initials(s.profile.coachName)}</div>
+          <div>
+            <div class="who">${esc(s.profile.coachName)} · your coach</div>
+            <div class="when">auto-nudge · ${nowTime()}</div>
+            <div class="quote" style="color:#e7ecf5">"${coachNudge(pace, calls)}"</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Daily summary & voice note</h3>
+        <p class="subtle" style="margin:0 0 10px">What did you do, what did you learn, where did you struggle? Captured for you and ${esc(s.profile.coachName)}.</p>
+        <div class="btn-row">
+          <button class="btn gold" data-act="open-voice">🎙 Record voice note</button>
+          <button class="btn outline" data-act="open-summary">✎ Write summary</button>
+        </div>
+        ${day.voiceNotes.length ? `<div class="subtle" style="margin-top:10px">${day.voiceNotes.length} voice note(s) saved today.</div>` : ''}
+        ${(day.summary.did || day.summary.learned || day.summary.struggled) ? `<div class="callout" style="margin-top:10px">${esc(day.summary.did || day.summary.learned || day.summary.struggled)}</div>` : ''}
+      </div>
+
+      <div class="card">
+        <h3>This week's activity</h3>
+        ${weekBars()}
+      </div>
+
+      <div class="card">
+        <h3>Predictive plan — tomorrow</h3>
+        ${pred.plans.map((p, i) => `<div class="callout ${i === 0 ? '' : ''}" style="margin-top:${i ? 8 : 0}px">→ ${esc(p.text)}</div>`).join('')}
+      </div>
+
+      <div class="card" data-act="nav:goals" style="cursor:pointer">
+        <h3>Your goals <span class="pill">view all →</span></h3>
+        <p class="subtle" style="margin:0">${s.buildFramework.goal ? esc(s.buildFramework.goal) : 'Set what every call is ultimately for.'}</p>
+      </div>
+    </section>`;
+  }
+
+  function numberRow(m, day) {
+    const s = S.get(); const val = day.numbers[m.key] || 0; const tgt = s.targets[m.key] ?? m.target;
+    const pct = Math.min(100, tgt ? Math.round((val / tgt) * 100) : 0);
+    const over = val >= tgt && tgt > 0;
+    return `<div class="num-row">
+      <div class="label"><div class="l">${esc(m.label)}</div>
+        <div class="track"><div class="fill ${over ? 'over' : ''}" style="width:${pct}%"></div></div></div>
+      <div class="stepper">
+        <button class="minus" data-act="num:${m.key}:-">−</button>
+        <div class="val">${val}<span class="t">/${tgt}</span></div>
+        <button data-act="num:${m.key}:+">＋</button>
+      </div></div>`;
+  }
+
+  function weekBars() {
+    const agg = Intel.aggregate(Intel.rangeKeys('weekly'));
+    const defs = Data.activityDefs();
+    const max = Math.max(...defs.map((d) => Math.max(agg.metrics[d.key].actual, agg.metrics[d.key].target, 1)));
+    return `<div class="bars">${defs.map((d) => {
+      const m = agg.metrics[d.key]; const h = Math.round((m.actual / max) * 100);
+      const cls = m.actual >= m.target ? 'over' : (m.actual < m.target * 0.7 ? 'under' : '');
+      return `<div class="bar"><div class="n">${m.actual}</div><div class="col ${cls}" style="height:${Math.max(6, h)}%"></div><div class="lbl">${esc(d.short)}</div></div>`;
+    }).join('')}</div>`;
+  }
+
+  /* ============================================================
+     AGENT — TRACK
+     ============================================================ */
+  let trackPeriod = 'weekly';
+  function viewTrack() {
+    const agg = Intel.aggregate(Intel.rangeKeys(trackPeriod));
+    const defs = Data.activityDefs(); const outs = Data.outcomeDefs();
+    const conv = Intel.conversions(agg);
+    const tabs = [['daily', 'Daily'], ['weekly', 'Weekly'], ['month', 'Monthly']];
+    return `<section class="screen active">
+      <div class="tabs">${tabs.map(([k, l]) => `<button class="${trackPeriod === k ? 'on' : ''}" data-act="track-period:${k}">${l}</button>`).join('')}</div>
+      <div class="card" style="display:flex;align-items:center;gap:14px">
+        ${ring(agg.pace, 'PACE', { light: true, color: agg.pace >= 85 ? 'var(--green)' : 'var(--gold)' })}
+        <div><div style="font-weight:800;font-size:16px">${agg.pace >= 100 ? 'Ahead of pace' : agg.pace >= 85 ? 'On pace' : 'Behind pace'}</div>
+        <div class="subtle">Hitting ${agg.pace}% of activity targets over ${Intel.rangeLabel(trackPeriod)}.${agg.assumedDays ? ` Minimums assumed for ${agg.assumedDays} unlogged day(s).` : ''}</div></div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">Activity</div>
+        ${defs.map((d) => { const m = agg.metrics[d.key]; const p = Intel.metricPace(m); const w = Math.min(100, p);
+          return `<div class="num-row"><div class="label"><div class="l">${esc(m.label)}</div>
+            <div class="track"><div class="fill ${p >= 100 ? 'over' : ''}" style="width:${w}%"></div></div></div>
+            <div class="stepper"><div class="val">${m.actual}<span class="t">/${m.target}</span></div>
+            <span class="tag ${p >= 100 ? 'green' : p < 70 ? 'red' : 'amber'}" style="min-width:44px;text-align:center">${p}%</span></div></div>`;
+        }).join('')}
+      </div>
+
+      <div class="card">
+        <div class="section-title">Conversion funnel</div>
+        ${conv.map((c) => `<div class="kv"><span class="k">${esc(c.from)} → ${esc(c.to)}</span><span class="v">${Math.round(c.rate * 100)}%</span></div>`).join('') || '<p class="subtle">Log more to see conversions.</p>'}
+      </div>
+
+      <div class="card">
+        <div class="section-title">Outcomes · this period</div>
+        ${outs.map((o) => `<div class="kv"><span class="k">${esc(o.label)}</span><span class="v" style="color:${o.bad ? 'var(--red)' : 'var(--green)'}">${agg.outcomes[o.key].actual}</span></div>`).join('')}
+      </div>
+    </section>`;
+  }
+
+  /* ============================================================
+     AGENT — PIPELINE / DATABASE / SPECIAL OPS
+     ============================================================ */
+  let pipeTab = 'pipeline';
+  function viewPipeline() {
+    const s = S.get(); const v = Data.vertical();
+    const tabs = [['pipeline', 'Pipeline'], ['database', 'Database'], ['special', 'Special Ops']];
+    let body = '';
+    if (pipeTab === 'pipeline') {
+      const active = s.pipeline.filter((p) => !p.stalled).length;
+      const stalled = s.pipeline.filter((p) => p.stalled).length;
+      const val = s.pipeline.reduce((a, p) => a + (p.value || 0), 0);
+      body = `<div class="stat3">
+          <div class="s"><div class="v">${active}</div><div class="k">Active</div></div>
+          <div class="s red"><div class="v">${stalled}</div><div class="k">Stalled</div></div>
+          <div class="s gold"><div class="v">${money(val)}</div><div class="k">${esc(v.valueLabel)}</div></div>
+        </div>
+        <div class="card">${s.pipeline.map((p) => pipeRow(p)).join('') || emptyState('No ' + v.pipelineNoun + 's yet.')}</div>`;
+    } else if (pipeTab === 'database') {
+      body = `<div class="card"><p class="subtle" style="margin:0 0 10px">Every prospect you're working, searchable. Tap to update stage or add a note.</p>
+        ${s.pipeline.concat([]).sort((a, b) => a.name.localeCompare(b.name)).map((p) => pipeRow(p, true)).join('') || emptyState('Database is empty.')}</div>`;
+    } else {
+      body = `<div class="card"><p class="subtle" style="margin:0 0 6px">Time-boxed focus campaigns — e.g. expired listings, win-backs, a farm street.</p></div>
+        ${s.specialOps.map((op) => specialOpCard(op)).join('') || emptyState('No special operations running.')}
+        <button class="btn gold" data-act="add-specialop" style="margin-top:12px">＋ New special operation</button>`;
+    }
+    return `<section class="screen active">
+      <div class="tabs">${tabs.map(([k, l]) => `<button class="${pipeTab === k ? 'on' : ''}" data-act="pipe-tab:${k}">${l}</button>`).join('')}</div>
+      ${body}
+      ${pipeTab !== 'special' ? `<button class="btn gold" data-act="add-pipeline" style="margin-top:12px">＋ Add ${esc(v.pipelineNoun)}</button>` : ''}
+    </section>`;
+  }
+
+  function pipeRow(p, db) {
+    const tone = p.stalled ? 'red' : (/(sold|won|listed|listing)/i.test(p.stage) ? 'green' : 'gold');
+    return `<div class="lrow" data-act="edit-pipeline:${p.id}">
+      <div class="mono">${initials(p.name)}</div>
+      <div class="main"><div class="t">${esc(p.name)}</div><div class="s">${esc(p.detail || '')}</div></div>
+      <div class="right"><span class="tag ${tone}">${esc(p.stage)}</span>${p.stalled ? '<div class="subtle" style="font-size:10px;color:var(--red);margin-top:3px">Stalled</div>' : `<div class="subtle" style="font-size:10px;margin-top:3px">${money(p.value)}</div>`}</div>
+    </div>`;
+  }
+
+  function specialOpCard(op) {
+    const done = op.items.filter((i) => i.done).length;
+    return `<div class="card"><h3>${esc(op.title)} <span class="pill">${done}/${op.items.length}</span></h3>
+      <p class="subtle" style="margin:0 0 10px">${esc(op.description)}</p>
+      ${op.items.map((i) => `<div class="focus-item ${i.done ? 'done' : ''}" data-act="specialop-item:${op.id}:${i.id}">
+        <div class="check ${i.done ? 'done' : ''}">${i.done ? '✓' : ''}</div><div class="txt">${esc(i.name)}</div></div>`).join('')}
+      <div class="btn-row" style="margin-top:10px"><button class="btn ghost sm" data-act="specialop-add:${op.id}">＋ Add target</button></div>
+    </div>`;
+  }
+
+  /* ============================================================
+     AGENT — CRM
+     ============================================================ */
+  function viewCRM() {
+    const s = S.get();
+    const overdue = s.crm.filter((c) => c.nextDate && c.nextDate < S.todayKey());
+    const sorted = [...s.crm].sort((a, b) => (a.nextDate || '9999').localeCompare(b.nextDate || '9999'));
+    return `<section class="screen active">
+      <div class="card" style="display:flex;justify-content:space-between;align-items:center">
+        <div><div style="font-weight:800">${s.crm.length} contacts</div><div class="subtle">${overdue.length} next-action(s) overdue</div></div>
+        <button class="btn gold sm" data-act="add-crm">＋ Contact</button>
+      </div>
+      <div class="card"><div class="section-title">Next actions</div>
+        ${sorted.map((c) => {
+          const od = c.nextDate && c.nextDate < S.todayKey();
+          return `<div class="lrow" data-act="edit-crm:${c.id}">
+            <div class="mono">${initials(c.name)}</div>
+            <div class="main"><div class="t">${esc(c.name)} <span class="tag ${c.type === 'Hot' ? 'red' : c.type === 'Warm' ? 'amber' : ''}" style="margin-left:4px">${esc(c.type || '')}</span></div>
+            <div class="s">${esc(c.nextAction || 'No next action')}</div></div>
+            <div class="right"><div class="subtle" style="font-size:11px;color:${od ? 'var(--red)' : 'var(--muted)'}">${c.nextDate ? S.fmtShort(c.nextDate) : ''}</div>
+            <button class="tag green" data-act="crm-done:${c.id}" style="margin-top:4px">Done</button></div>
+          </div>`;
+        }).join('') || emptyState('No contacts yet.')}
+      </div>
+      <div class="card"><div class="section-title">Backup & restore</div>
+        <p class="subtle" style="margin:0 0 10px">Your CRM and all data lives on this device. Export a backup file regularly, or restore from one.</p>
+        <div class="btn-row">
+          <button class="btn outline" data-act="backup-export">⭳ Export backup</button>
+          <button class="btn outline" data-act="backup-import">⭱ Restore</button>
+        </div>
+      </div>
+    </section>`;
+  }
+
+  /* ============================================================
+     AGENT — REPORTS
+     ============================================================ */
+  let reportType = 'weekly';
+  function viewReports() {
+    const s = S.get();
+    const r = Intel.buildReport(reportType);
+    const types = [['daily', 'Day'], ['weekly', 'Week'], ['fortnight', 'Fortnight'], ['month', 'Month'], ['quarter', 'QTR'], ['biyear', 'Bi-Year']];
+    return `<section class="screen active">
+      <div class="tabs">${types.map(([k, l]) => `<button class="${reportType === k ? 'on' : ''}" data-act="report-type:${k}">${l}</button>`).join('')}</div>
+      <div class="card dark" style="display:flex;align-items:center;gap:14px">
+        ${ring(r.score, '', { color: r.score >= 85 ? 'var(--green)' : 'var(--gold)' })}
+        <div><div style="font-family:var(--serif);font-size:22px;font-weight:600">${r.title}</div>
+        <div class="subtle" style="color:#c9d2e2">${r.rangeLabel}</div>
+        <div class="subtle" style="color:#aeb9cd;margin-top:2px">Auto-shared with ${esc(r.coachName)}</div></div>
+      </div>
+
+      <div class="card"><div class="section-title">Activity vs target</div>${weekBarsFor(r.agg)}</div>
+
+      <div class="card"><div class="section-title">What's working</div>
+        <ul class="list-plain">${r.working.map((w) => `<li><span class="mk">✓</span><span>${esc(w)}</span></li>`).join('') || '<li class="subtle">Keep logging to surface wins.</li>'}</ul>
+      </div>
+      <div class="card"><div class="section-title">Areas to improve</div>
+        <ul class="list-plain">${r.improve.map((w) => `<li><span class="mk warn">!</span><span>${esc(w)}</span></li>`).join('') || '<li class="subtle">Nothing flagged — strong period.</li>'}</ul>
+      </div>
+
+      <div class="card"><h3>${esc(r.coachName)}'s playbook — get better</h3>
+        ${r.suggestions.map((t) => `<div class="callout ${t.tone === 'good' ? 'green' : ''}">${esc(t.text)}</div>`).join('')}
+      </div>
+      <div class="card"><div class="section-title">Predictive — next moves</div>
+        ${r.predictive.plans.map((p) => `<div class="callout">→ ${esc(p.text)}</div>`).join('')}
+      </div>
+
+      <div class="btn-row" style="margin-top:14px">
+        <button class="btn gold" data-act="send-report">Send to ${esc(r.coachName)}</button>
+        <button class="btn outline" data-act="copy-report">Copy</button>
+      </div>
+      <p class="subtle" style="text-align:center;margin-top:10px">Daily, weekly, fortnight, month, QTR & bi-year — generated from your logged inputs.</p>
+    </section>`;
+  }
+
+  function weekBarsFor(agg) {
+    const defs = Data.activityDefs();
+    const max = Math.max(...defs.map((d) => Math.max(agg.metrics[d.key].actual, agg.metrics[d.key].target, 1)));
+    return `<div class="bars">${defs.map((d) => {
+      const m = agg.metrics[d.key]; const h = Math.round((m.actual / max) * 100);
+      const cls = m.actual >= m.target ? 'over' : (m.actual < m.target * 0.7 ? 'under' : '');
+      return `<div class="bar"><div class="n">${m.actual}</div><div class="col ${cls}" style="height:${Math.max(6, h)}%"></div><div class="lbl">${esc(d.short)}</div></div>`;
+    }).join('')}</div>`;
+  }
+
+  /* ============================================================
+     AGENT — GOALS
+     ============================================================ */
+  function viewGoals() {
+    const s = S.get(); const bf = s.buildFramework;
+    return `<section class="screen active">
+      <div class="card"><h3>Build the best agent</h3>
+        <div class="kv"><span class="k">Goal</span><span class="v" style="text-align:right;max-width:60%">${esc(bf.goal || '—')}</span></div>
+        <div class="kv"><span class="k">Proof</span><span class="v" style="text-align:right;max-width:60%">${esc(bf.proof || '—')}</span></div>
+        <div class="section-title" style="margin-top:12px">Steps</div>
+        <ul class="list-plain">${(bf.steps || []).map((st) => `<li><span class="mk">→</span><span>${esc(st)}</span></li>`).join('') || '<li class="subtle">No steps yet.</li>'}</ul>
+        <button class="btn outline sm" data-act="edit-build" style="margin-top:10px">Edit framework</button>
+      </div>
+      <div class="card"><h3>Your goals <button class="btn gold sm" data-act="add-goal">＋ Add</button></h3>
+        <div class="grid2">${s.goals.map((g) => `<div class="goalcard" data-act="edit-goal:${g.id}">
+          <div class="cat">${esc(g.category)}</div><div class="ti">${esc(g.title)}</div><div class="de">${esc(g.detail || '')}</div></div>`).join('')}</div>
+      </div>
+      <p class="subtle" style="text-align:center;margin-top:12px">What every call is ultimately for.</p>
+    </section>`;
+  }
+
+  /* ============================================================
+     COACH VIEWS
+     ============================================================ */
+  function coachDashboard() {
+    const s = S.get(); const r = s.coachRoster;
+    const onTrack = r.filter((c) => c.status === 'On track').length;
+    const atRisk = r.filter((c) => c.status === 'At risk').length;
+    const checkins = r.filter((c) => /Today/.test(c.last)).length;
+    return `<section class="screen active">
+      <div class="grid2">
+        <div class="card" style="margin-top:0"><div class="section-title">Active clients</div><div style="font-size:26px;font-weight:800">${r.length}</div></div>
+        <div class="card" style="margin-top:0"><div class="section-title">On track</div><div style="font-size:26px;font-weight:800;color:var(--green)">${onTrack}</div></div>
+        <div class="card" style="margin-top:0"><div class="section-title">At risk</div><div style="font-size:26px;font-weight:800;color:var(--red)">${atRisk}</div></div>
+        <div class="card" style="margin-top:0"><div class="section-title">Check-ins today</div><div style="font-size:26px;font-weight:800">${checkins}/${r.length}</div></div>
+      </div>
+      <div class="card"><h3>Your clients <span class="pill">tap to drill in</span></h3>
+        ${r.map((c) => {
+          const tone = c.status === 'On track' ? 'green' : c.status === 'At risk' ? 'red' : 'amber';
+          return `<div class="lrow" data-act="coach-client:${esc(c.name)}">
+            <div class="mono">${initials(c.name)}</div>
+            <div class="main"><div class="t">${esc(c.name)}</div><div class="s">${esc(c.type)} · ${esc(c.last)} · ${c.streak}d</div></div>
+            <div class="right"><span class="tag ${tone}">${esc(c.status)}</span><div class="subtle" style="font-size:11px;margin-top:3px">${c.pace}%</div></div>
+          </div>`;
+        }).join('')}
+      </div>
+    </section>`;
+  }
+
+  function coachClients() {
+    const s = S.get();
+    return `<section class="screen active">
+      <div class="card"><p class="subtle" style="margin:0">Full client roster. Each agent's data, reports and voice notes roll up here. (Cloud sync arrives in the next phase — for now this shows the demo roster.)</p></div>
+      ${s.coachRoster.map((c) => `<div class="card" style="display:flex;align-items:center;gap:12px" data-act="coach-client:${esc(c.name)}">
+        <div class="avatar lg">${initials(c.name)}</div>
+        <div style="flex:1"><div style="font-weight:800">${esc(c.name)}</div><div class="subtle">${esc(c.type)} · ${c.pace}% pace · ${c.streak}-day streak</div></div>
+        <span class="tag ${c.status === 'On track' ? 'green' : c.status === 'At risk' ? 'red' : 'amber'}">${esc(c.status)}</span>
+      </div>`).join('')}
+    </section>`;
+  }
+
+  function coachAlerts() {
+    const s = S.get();
+    return `<section class="screen active">
+      <div class="card"><p class="subtle" style="margin:0">Flagged automatically from missed entries, pace and check-ins.</p></div>
+      ${(s.demoAlerts || []).map((a) => `<div class="card" style="display:flex;align-items:center;gap:10px">
+        <span class="rec-dot" style="background:${a.tone === 'green' ? 'var(--green)' : a.tone === 'amber' ? 'var(--amber)' : 'var(--red)'};animation:none"></span>
+        <div style="flex:1"><div style="font-weight:800">${esc(a.name)} <span class="tag ${a.tone === 'green' ? 'green' : a.tone === 'amber' ? 'amber' : 'red'}" style="margin-left:4px">${esc(a.kind)}</span></div>
+        <div class="subtle">${esc(a.text)}</div></div>
+        <button class="btn outline sm" data-act="coach-client:${esc(a.name)}">Review</button>
+      </div>`).join('')}
+    </section>`;
+  }
+
+  /* ============================================================
+     helpers
+     ============================================================ */
+  function greeting() { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; }
+  function nowTime() { return new Date().toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' }); }
+  function money(n) { n = n || 0; if (n >= 1e6) return '$' + (n / 1e6).toFixed(1) + 'm'; if (n >= 1e3) return '$' + Math.round(n / 1e3) + 'k'; return '$' + n; }
+  function emptyState(msg) { return `<div class="empty"><div class="big">◇</div>${esc(msg)}</div>`; }
+  function coachNudge(pace, calls) {
+    const left = Math.max(0, calls.target - calls.done);
+    if (pace >= 100) return `You're over target already — bank it, then get one more appraisal booked before you switch off.`;
+    if (left > 0) return `You're at ${pace}% of today with ${left} calls to go. Two 25-minute blocks clears it — protect 2:00 and 4:00.`;
+    return `Calls done. Now convert — follow up two warm ones before the day closes.`;
+  }
+
+  global.UI = {
+    render, renderOnboarding, toast, openSheet, closeSheet,
+    get current() { return current; }, set current(v) { current = v; },
+    get coachView() { return coachView; }, set coachView(v) { coachView = v; },
+    get onbStep() { return onbStep; }, set onbStep(v) { onbStep = v; },
+    get pipeTab() { return pipeTab; }, set pipeTab(v) { pipeTab = v; },
+    get trackPeriod() { return trackPeriod; }, set trackPeriod(v) { trackPeriod = v; },
+    get reportType() { return reportType; }, set reportType(v) { reportType = v; },
+    get onbTmp() { return onbTmp; },
+    captureOnb, finishOnboarding, initials, esc, money, ring,
+  };
+})(window);
