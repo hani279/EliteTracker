@@ -35,10 +35,32 @@
   async function boot() {
     if (booted) return; booted = true;
     await Auth.init();
-    Auth.onChange(() => UI.render());
-    if (Auth.getSession()) { try { await Sync.pull(); } catch (e) { console.warn('sync pull failed', e); } }
+    Auth.onChange(async () => { await syncForSession(); UI.render(); });
+    await syncForSession();
     UI.render();
     scheduleReminders();
+  }
+
+  /* Local storage isn't scoped per-user — it's one shared cache for
+     whichever account is currently signed in on this browser. Two
+     things have to happen whenever the signed-in uid changes:
+       1. if a DIFFERENT account's data is sitting in that cache,
+          wipe it first, or the new session renders with the old
+          user's onboarding state / roster / numbers still attached.
+       2. pull that account's real rows down from Supabase — a login
+          (as opposed to a fresh page load, which boot() already
+          covered) never fetched them otherwise, so a returning user
+          logging in on a new device would fall through to onboarding
+          despite already having a real, onboarded account.
+     Idempotent by design (keyed off Store.lastUid()) so it's safe to
+     call from both boot() and the post-login/OAuth-redirect path
+     without double-pulling. */
+  async function syncForSession() {
+    const session = Auth.getSession();
+    if (!session || S.lastUid() === session.id) return;
+    if (S.lastUid()) S.reset();
+    S.setLastUid(session.id);
+    try { await Sync.pull(); } catch (e) { console.warn('sync pull failed', e); }
   }
 
   /* ---------- event delegation ---------- */
@@ -166,6 +188,7 @@
     }
     UI.authError = ''; UI.authInfo = '';
     if (isSignup && !UI.onbTmp.name) UI.onbTmp.name = result.user.name;
+    await syncForSession();
     UI.render();
   }
   async function authGoogle(btn) {

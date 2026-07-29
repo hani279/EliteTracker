@@ -68,6 +68,16 @@
   function reset() { state = defaultState(); save(); }
   function replace(obj) { state = Object.assign(defaultState(), obj); save(); }
 
+  // -------- last-signed-in uid marker --------
+  // Kept outside the main state blob (its own key) so it survives reset()
+  // and load() unchanged. This is what lets boot() tell "same user
+  // returning" apart from "a different account just signed in on this
+  // browser" — the two need very different handling (keep the local
+  // cache vs. wipe it before it leaks into the new session).
+  const LAST_UID_KEY = 'elite_tracker_last_uid_v1';
+  function lastUid() { try { return localStorage.getItem(LAST_UID_KEY); } catch (e) { return null; } }
+  function setLastUid(id) { try { if (id) localStorage.setItem(LAST_UID_KEY, id); else localStorage.removeItem(LAST_UID_KEY); } catch (e) { /* ignore */ } }
+
   // -------- day record helper --------
   function dayRecord(key) {
     const s = get();
@@ -138,7 +148,7 @@
 
   global.Store = {
     KEY, load, save, get, reset, replace, defaultState, onSave,
-    dayRecord, uid,
+    dayRecord, uid, lastUid, setLastUid,
     todayKey, parseKey, addDays, fmtDate, fmtShort,
     putAudio, getAudio, delAudio,
   };
