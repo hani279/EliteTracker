@@ -97,6 +97,19 @@
         id: r.id, profile_id: pid, type: r.type, range_label: r.rangeLabel, score: r.score,
       })));
     }
+
+    // Only rows whose audio finished uploading (storagePath set) — a note
+    // still mid-upload gets pushed on the next debounced cycle once
+    // uploadVoiceNote() (app.js) sets storagePath and calls S.save() itself.
+    const voiceNotes = [];
+    Object.keys(s.days || {}).forEach((day) => {
+      (s.days[day].voiceNotes || []).forEach((v) => {
+        if (v.storagePath) voiceNotes.push({
+          id: v.id, profile_id: pid, day, storage_path: v.storagePath, duration_sec: v.durationSec || null,
+        });
+      });
+    });
+    if (voiceNotes.length) await c.from('voice_notes').upsert(voiceNotes);
   }
 
   /* ---------- pull: remote -> local (boot only, returning users) ---------- */
@@ -130,6 +143,19 @@
         reviewedEOD: !!d.reviewed_eod, logged: !!d.logged,
         voiceNotes: (existing && existing.voiceNotes) || [],
       };
+    });
+
+    // Merge server voice-note metadata into whichever day it belongs to —
+    // the audio blob itself may or may not be cached locally (see
+    // playVoice() in app.js, which falls back to a Storage download when
+    // it isn't); this only restores the list so it shows up at all on a
+    // device that never recorded it.
+    const { data: voiceNotes } = await c.from('voice_notes').select('*').eq('profile_id', pid);
+    if (voiceNotes) voiceNotes.forEach((v) => {
+      const rec = s.days[v.day]; if (!rec) return;
+      rec.voiceNotes = rec.voiceNotes || [];
+      if (rec.voiceNotes.some((x) => x.id === v.id)) return;
+      rec.voiceNotes.push({ id: v.id, ts: Date.parse(v.created_at) || Date.now(), durationSec: v.duration_sec, storagePath: v.storage_path });
     });
 
     const { data: pipeline } = await c.from('pipeline_items').select('*').eq('profile_id', pid);

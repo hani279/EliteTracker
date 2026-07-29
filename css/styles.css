@@ -389,3 +389,27 @@ svg{display:block}
 .toggle .knob{width:17px;height:17px;border-radius:var(--radius-pill);background:var(--bone);position:absolute;top:3px;left:3px;transition:.2s}
 .toggle.on{background:var(--gold)}
 .toggle.on .knob{left:20px;background:var(--ink)}
+
+/* ---------- print (report export) ----------
+   Reuses the on-screen report markup as-is rather than building a
+   separate export template — "Download PDF" just forces the light
+   theme's flat, opaque values (glass/blur effects don't rasterize
+   reliably to print) and hides everything that isn't the report
+   itself, then calls window.print(). Every browser's print dialog
+   offers "Save as PDF" natively, so no PDF library is needed. */
+@media print{
+  :root{
+    --page-bg:#fff; --surface-1:#fff; --surface-2:#f3f4f7;
+    --hairline:#d7dae2; --hairline-soft:#e5e7ee;
+    --bone:#182238; --bone-muted:#4c5568; --bone-faint:#5c6478;
+    --gold-ink:#7a5a1d; --clay-ink:#a24a2e;
+    --glass-1:#fff; --glass-2:#f3f4f7; --glass-sheen:none;
+    --page-wash:none; --shadow-resting:none; --shadow-floating:none;
+  }
+  body{background:#fff}
+  #topbar, #bottomnav, .tabs, .btn-row, #sheet-backdrop, .toast, #onboarding{display:none !important}
+  #app{max-width:none}
+  #main{display:block !important}
+  .card{-webkit-backdrop-filter:none;backdrop-filter:none;box-shadow:none;border:1px solid var(--hairline);break-inside:avoid}
+  .screen{padding-bottom:0}
+}

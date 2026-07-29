@@ -148,6 +148,7 @@
     if (cmd === 'report-type') { UI.reportType = a; rerender(); return; }
     if (cmd === 'send-report') return sendReport();
     if (cmd === 'copy-report') return copyReport();
+    if (cmd === 'pdf-report') return pdfReport();
 
     // ---- goals / build ----
     if (cmd === 'edit-build') return buildSheet();
@@ -292,7 +293,7 @@
   function voiceSheet() {
     const d = S.dayRecord();
     UI.openSheet(`<h3>Voice notes</h3>
-      <p class="subtle">One quick note — what did you do, learn, struggle with. Stored on your device; transcription & auto-summary to your coach arrive with cloud sync.</p>
+      <p class="subtle">One quick note — what did you do, learn, struggle with. Syncs to your coach in the background; transcription & auto-summary are next.</p>
       <div id="rec-ui" style="text-align:center;margin:18px 0">
         <button class="btn gold" id="rec-btn" data-act="rec-start">${Icons.svg('mic', { size: 15 })} Start recording</button>
         <div id="rec-time" class="subtle" style="margin-top:8px"></div>
@@ -321,10 +322,11 @@
       mediaRecorder.onstop = async () => {
         const blob = new Blob(chunks, { type: mediaRecorder.mimeType || 'audio/webm' });
         const id = S.uid(); await S.putAudio(id, blob);
-        const d = S.dayRecord(); d.voiceNotes.push({ id, ts: Date.now(), durationSec: recSecs }); S.save();
+        const d = S.dayRecord(); d.voiceNotes.push({ id, ts: Date.now(), durationSec: recSecs, storagePath: null }); S.save();
         stream.getTracks().forEach((tr) => tr.stop());
         const list = $('vn-list'); if (list) list.innerHTML = voiceListHtml(d);
         UI.toast('Voice note saved');
+        uploadVoiceNote(id, blob);
       };
       mediaRecorder.start(); recSecs = 0;
       const btn = $('rec-btn'); if (btn) { btn.innerHTML = Icons.svg('stop', { size: 15 }) + ' Stop recording'; btn.setAttribute('data-act', 'rec-stop'); }
@@ -337,13 +339,46 @@
     const btn = $('rec-btn'); if (btn) { btn.innerHTML = Icons.svg('mic', { size: 15 }) + ' Start recording'; btn.setAttribute('data-act', 'rec-start'); }
     const t = $('rec-time'); if (t) t.textContent = '';
   }
+  // Fire-and-forget, same pattern as sync.js's push(): the recording is
+  // already safe locally (IndexedDB) either way, so a failed upload just
+  // means it stays device-only until the next successful attempt — there's
+  // no local mutation here to retry from, so on failure it's dropped rather
+  // than left half-set (a storagePath must mean the object really exists,
+  // since sync.js's push() takes its presence as "safe to upsert into
+  // voice_notes").
+  async function uploadVoiceNote(id, blob) {
+    const c = global.Supa && Supa.getClient(); const session = global.Auth && Auth.getSession();
+    if (!c || !session) return;
+    const ext = (blob.type.split('/')[1] || 'webm').split(';')[0];
+    const path = `${session.id}/${id}.${ext}`;
+    const { error } = await c.storage.from('voice-notes').upload(path, blob, { contentType: blob.type });
+    if (error) { console.warn('voice note upload failed', error); return; }
+    const d = S.dayRecord(); const v = (d.voiceNotes || []).find((x) => x.id === id);
+    if (v) { v.storagePath = path; S.save(); }
+  }
   async function playVoice(id) {
-    const blob = await S.getAudio(id); if (!blob) { UI.toast('Audio not found'); return; }
+    let blob = await S.getAudio(id);
+    if (!blob) {
+      const d = S.dayRecord(); const v = (d.voiceNotes || []).find((x) => x.id === id);
+      const c = global.Supa && Supa.getClient();
+      if (v && v.storagePath && c) {
+        const { data, error } = await c.storage.from('voice-notes').download(v.storagePath);
+        if (!error && data) { blob = data; S.putAudio(id, blob); }
+      }
+    }
+    if (!blob) { UI.toast('Audio not found'); return; }
     const url = URL.createObjectURL(blob); const audio = new Audio(url); audio.play();
     audio.onended = () => URL.revokeObjectURL(url);
   }
   async function delVoice(id) {
-    await S.delAudio(id); const d = S.dayRecord(); d.voiceNotes = d.voiceNotes.filter((v) => v.id !== id); S.save();
+    const d = S.dayRecord(); const v = (d.voiceNotes || []).find((x) => x.id === id);
+    await S.delAudio(id);
+    const c = global.Supa && Supa.getClient();
+    if (v && v.storagePath && c) {
+      c.storage.from('voice-notes').remove([v.storagePath]).catch(() => {});
+      c.from('voice_notes').delete().eq('id', id).catch(() => {});
+    }
+    d.voiceNotes = d.voiceNotes.filter((x) => x.id !== id); S.save();
     const list = $('vn-list'); if (list) list.innerHTML = voiceListHtml(d); UI.toast('Deleted');
   }
 
@@ -476,6 +511,19 @@
   async function copyReport() {
     try { await navigator.clipboard.writeText(currentReportText()); UI.toast('Report copied'); }
     catch (e) { UI.toast('Copy not supported'); }
+  }
+  function pdfReport() {
+    // No PDF library needed — the browser's own print dialog offers
+    // "Save as PDF" everywhere, and document.title becomes its default
+    // filename. css/styles.css's @media print block strips the app chrome
+    // down to just the report card content for this. window.print() blocks
+    // until the dialog closes on some browsers but not others, so the
+    // title is restored on 'afterprint' rather than right after the call.
+    const r = Intel.buildReport(UI.reportType);
+    const prevTitle = document.title;
+    document.title = `ELITE Tracker — ${r.title} — ${r.agentName}`;
+    window.addEventListener('afterprint', () => { document.title = prevTitle; }, { once: true });
+    window.print();
   }
 
   /* ---------- build framework + goals ---------- */

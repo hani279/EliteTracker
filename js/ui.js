@@ -624,6 +624,7 @@
       <div class="btn-row" style="margin-top:14px">
         <button class="btn gold" data-act="send-report">Send to ${esc(r.coachName)}</button>
         <button class="btn outline" data-act="copy-report">Copy</button>
+        <button class="btn outline" data-act="pdf-report">${Icons.svg('file', { size: 14 })} PDF</button>
       </div>
       <p class="subtle" style="text-align:center;margin-top:10px">Daily, weekly, fortnight, month, QTR & bi-year — generated from your logged inputs.</p>
     </section>`;

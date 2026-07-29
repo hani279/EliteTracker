@@ -83,11 +83,26 @@ same login) all confirmed correct — including that the RLS boundary actually
 holds: the coach could read the linked agent's data but a write attempt
 against it affected zero rows.
 
-Voice note **audio files** are still IndexedDB-only (not yet uploaded to
-Supabase Storage) — that's part of the transcription/AI-summary phase, not
-this one.
+Voice note **audio** now uploads to Supabase Storage in the background too
+(see step 6 below for the one-time setup this needs) — transcription and
+AI summary are the next phase, not this one.
 
-## 6. Sanity check
+## 6. Voice note storage
+
+Recording still saves to IndexedDB first and instantly, same as every other
+local-first write in this app — the Storage upload happens after, in the
+background, and only ever adds a device-only fallback to "notes cached on
+this phone" if it's offline or fails.
+
+1. In the Supabase **SQL Editor**, run
+   [`supabase/migrations/0002_voice_notes_storage.sql`](supabase/migrations/0002_voice_notes_storage.sql).
+   It reshapes the `voice_notes` table (drops the `day_record_id` link in
+   favor of the same `day` key every other table uses) and creates a
+   private `voice-notes` Storage bucket with the same owner-full /
+   coach-read-only policies as everything else.
+2. That's it — no new credentials, same client already handles Storage.
+
+## 7. Sanity check
 
 1. Sign up as a coach → check **Table Editor → profiles** for a new row with
    `role = 'coach'` and a generated `coach_code`.
