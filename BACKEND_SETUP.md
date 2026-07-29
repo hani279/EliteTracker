@@ -102,7 +102,62 @@ this phone" if it's offline or fails.
    coach-read-only policies as everything else.
 2. That's it — no new credentials, same client already handles Storage.
 
-## 7. Sanity check
+## 7. Push notifications (coach "Send nudge")
+
+Everything else in this app runs entirely on the client talking to
+Supabase's database/auth/storage — this is the first feature that needs
+actual server-side code, because delivering a push notification requires
+a private key that can never be exposed in the browser. That code lives in
+`supabase/functions/send-nudge/` and runs as a Supabase Edge Function.
+
+This step needs the [Supabase CLI](https://supabase.com/docs/guides/cli) —
+`npx supabase <command>` works fine without a global install, no separate
+signup, it uses the same Supabase account you already have.
+
+1. **Link this project to your Supabase project** (one-time):
+   ```
+   npx supabase login
+   npx supabase link --project-ref qvxorxlfmsgtazrfxsnj
+   ```
+2. **Run the migration** — same as before, paste
+   [`supabase/migrations/0003_push_notifications.sql`](supabase/migrations/0003_push_notifications.sql)
+   into the SQL Editor and run it. This creates `push_subscriptions` (where
+   each device registers itself) with owner-only RLS.
+3. **Set the function's secrets** (the VAPID keypair). The public half is
+   already embedded in `js/supabase-client.js` (safe — that half is meant
+   to be public, same idea as the anon key). The **private** half is a
+   real secret and deliberately isn't written down anywhere in this repo
+   — it was generated once and shared with you directly outside of any
+   committed file. Grab it from there, or generate a fresh pair yourself
+   (any VAPID generator works — `npx web-push generate-vapid-keys` is the
+   simplest) and update `VAPID_PUBLIC_KEY` in `js/supabase-client.js` to
+   match if you do:
+   ```
+   npx supabase secrets set VAPID_PUBLIC_KEY=<the public key in js/supabase-client.js>
+   npx supabase secrets set VAPID_PRIVATE_KEY=<the private key — never commit this>
+   npx supabase secrets set VAPID_SUBJECT=mailto:you@yourdomain.com
+   ```
+   (Swap the `mailto:` for a real address you control — push services use
+   it to contact you if your server ever misbehaves.)
+4. **Deploy the function**:
+   ```
+   npx supabase functions deploy send-nudge
+   ```
+5. Reload the app, log in as an agent, open the reminders sheet and enable
+   reminders (this is what triggers the browser's notification-permission
+   prompt and registers the device) — accept the permission prompt.
+6. As the coach, open that agent from **Clients**, tap **Send nudge**. A
+   real notification should arrive even if the agent's tab is closed
+   (though not if the browser itself is fully quit — that's a platform
+   limit, not this app's).
+
+Scheduled reminders (morning focus / EOD log prompts) still only fire
+while the app is open in a tab, same as before this step — turning those
+into background push too would mean the function running on a timer
+against every user's own local time zone, which is a bigger lift than
+"coach taps a button right now." Worth doing later if it matters enough.
+
+## 8. Sanity check
 
 1. Sign up as a coach → check **Table Editor → profiles** for a new row with
    `role = 'coach'` and a generated `coach_code`.

@@ -367,7 +367,9 @@
       </div>
 
       <div class="card">
-        <h3>Today's focus <span class="pill">${doneFocus}/${day.focus.length}</span></h3>
+        <h3>Today's focus <span class="pill">${doneFocus}/${day.focus.length}</span>
+          <button class="btn ghost sm" data-act="focus-to-calendar" title="Add today's timed focus blocks to your calendar">${Icons.svg('calendar', { size: 13 })}</button>
+        </h3>
         ${day.focus.map((f) => `
           <div class="focus-item ${f.done ? 'done' : ''}" data-act="focus:${f.id}">
             <div class="check ${f.done ? 'done' : ''}">${f.done ? Icons.svg('check', { size: 12 }) : ''}</div>
@@ -680,7 +682,7 @@
       <div class="card"><h3>Your clients <span class="pill">tap to drill in</span></h3>
         ${r.map((c) => {
           const tone = c.status === 'On track' ? 'green' : c.status === 'At risk' ? 'red' : 'amber';
-          return `<div class="lrow" data-act="coach-client:${esc(c.name)}">
+          return `<div class="lrow" data-act="coach-client:${esc(c.id)}">
             <div class="mono">${initials(c.name)}</div>
             <div class="main"><div class="t">${esc(c.name)}</div><div class="s">${esc(c.type)} · ${esc(c.last)} · ${c.streak}d</div></div>
             <div class="right"><span class="tag ${tone}">${esc(c.status)}</span><div class="subtle" style="font-size:11px;margin-top:3px">${c.pace}%</div></div>
@@ -695,7 +697,7 @@
     if (!s.coachRoster.length) return coachEmptyState();
     return `<section class="screen active">
       <div class="card"><p class="subtle" style="margin:0">Full client roster — each agent's own pace, streak and check-ins, pulled live from their data.</p></div>
-      ${s.coachRoster.map((c) => `<div class="card" style="display:flex;align-items:center;gap:12px" data-act="coach-client:${esc(c.name)}">
+      ${s.coachRoster.map((c) => `<div class="card" style="display:flex;align-items:center;gap:12px" data-act="coach-client:${esc(c.id)}">
         <div class="avatar lg">${initials(c.name)}</div>
         <div style="flex:1"><div style="font-weight:600">${esc(c.name)}</div><div class="subtle">${esc(c.type)} · ${c.pace}% pace · ${c.streak}-day streak</div></div>
         <span class="tag ${c.status === 'On track' ? 'green' : c.status === 'At risk' ? 'red' : 'amber'}">${esc(c.status)}</span>
@@ -712,7 +714,7 @@
         <span class="rec-dot" style="background:${a.tone === 'green' ? 'var(--green)' : a.tone === 'amber' ? 'var(--amber)' : 'var(--clay)'};animation:none"></span>
         <div style="flex:1"><div style="font-weight:600">${esc(a.name)} <span class="tag ${a.tone === 'green' ? 'green' : a.tone === 'amber' ? 'amber' : 'red'}" style="margin-left:4px">${esc(a.kind)}</span></div>
         <div class="subtle">${esc(a.text)}</div></div>
-        <button class="btn outline sm" data-act="coach-client:${esc(a.name)}">Review</button>
+        <button class="btn outline sm" data-act="coach-client:${esc(a.id)}">Review</button>
       </div>`).join('') : emptyState('No alerts — everyone is on track.')}
     </section>`;
   }

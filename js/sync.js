@@ -262,7 +262,7 @@
     else status = 'At risk';
 
     return {
-      name: agent.name || 'Unnamed', type: vKey === 'sales' ? 'Sales' : 'Real Estate',
+      id: agent.id, name: agent.name || 'Unnamed', type: vKey === 'sales' ? 'Sales' : 'Real Estate',
       status, pace, streak: streakCount, last: fmtLastCheckin(lastKey, lastRow && lastRow.updated_at),
     };
   }
@@ -281,7 +281,7 @@
 
   function buildAlerts(roster) {
     return roster.filter((c) => c.status !== 'On track').map((c) => ({
-      name: c.name,
+      id: c.id, name: c.name,
       kind: c.status === 'At risk' ? 'AT RISK' : 'WATCH',
       tone: c.status === 'At risk' ? 'red' : 'amber',
       text: c.status === 'At risk'

@@ -7,8 +7,8 @@
    still read a stale browser-cached response for the same URL. Bumping
    the query string forces a genuinely new URL, which forces a real fetch.
    Bump both together on every deploy. */
-const CACHE = 'elite-tracker-v15';
-const V = '?v=15';
+const CACHE = 'elite-tracker-v16';
+const V = '?v=16';
 const ASSETS = [
   './',
   './index.html',
@@ -17,6 +17,7 @@ const ASSETS = [
   './js/supabase-client.js' + V,
   './js/auth.js' + V,
   './js/store.js' + V,
+  './js/push.js' + V,
   './js/sync.js' + V,
   './js/data.js' + V,
   './js/intelligence.js' + V,
@@ -71,6 +72,17 @@ self.addEventListener('fetch', (e) => {
       return cached || network;
     })
   );
+});
+
+// Web Push — delivered by the send-nudge Edge Function, shows even when
+// the app isn't open (unlike the in-page Notification calls in app.js,
+// which only fire while a tab is running).
+self.addEventListener('push', (e) => {
+  let data = { title: 'ELITE Tracker', body: 'You have a new nudge.' };
+  try { if (e.data) data = Object.assign(data, e.data.json()); } catch (err) { /* non-JSON payload, use default */ }
+  e.waitUntil(self.registration.showNotification(data.title, {
+    body: data.body, icon: 'icons/icon-192.png', badge: 'icons/icon-192.png',
+  }));
 });
 
 // Local notification support (works while SW is alive / app installed)

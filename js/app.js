@@ -39,6 +39,7 @@
     await syncForSession();
     UI.render();
     scheduleReminders();
+    if ('Notification' in window && Notification.permission === 'granted' && global.Push) Push.subscribe();
   }
 
   /* Local storage isn't scoped per-user — it's one shared cache for
@@ -163,6 +164,7 @@
     if (cmd === 'save-settings') return saveSettings();
     if (cmd === 'enable-reminders') return enableReminders();
     if (cmd === 'export-ics') return exportICS();
+    if (cmd === 'focus-to-calendar') return exportFocusICS();
     if (cmd === 'install-app') return doInstall();
     if (cmd === 'switch-vertical') return switchVertical();
     if (cmd === 'reset-app') return resetApp();
@@ -556,8 +558,8 @@
   }
 
   /* ---------- coach client drill-in ---------- */
-  function coachClientSheet(name) {
-    const s = S.get(); const c = s.coachRoster.find((x) => x.name === name) || { name, type: '', pace: 0, streak: 0, status: '' };
+  function coachClientSheet(id) {
+    const s = S.get(); const c = s.coachRoster.find((x) => x.id === id) || { id, name: 'Agent', type: '', pace: 0, streak: 0, status: '' };
     UI.openSheet(`<h3>${UI.esc(c.name)}</h3>
       <div class="kv"><span class="k">Type</span><span class="v">${UI.esc(c.type)}</span></div>
       <div class="kv"><span class="k">Status</span><span class="v">${UI.esc(c.status)}</span></div>
@@ -567,7 +569,22 @@
       <div class="callout" style="margin-top:14px">${Icons.svg('target', { size: 15 })}<span>${coachClientTip(c)}</span></div>
       <div class="btn-row" style="margin-top:14px"><button class="btn outline" data-act="close-sheet">Close</button>
       <button class="btn gold" id="cc-msg">Send nudge</button></div>`);
-    $('cc-msg').addEventListener('click', () => { UI.closeSheet(); UI.toast('Nudge sent to ' + c.name); });
+    $('cc-msg').addEventListener('click', () => sendNudge(c));
+  }
+  async function sendNudge(c) {
+    UI.closeSheet();
+    const cSupa = global.Supa && Supa.getClient();
+    if (!cSupa) { UI.toast('Nudge sent to ' + c.name); return; }
+    try {
+      const { data, error } = await cSupa.functions.invoke('send-nudge', {
+        body: { agentId: c.id, title: 'Nudge from your coach', body: coachClientTip(c) },
+      });
+      if (error) throw error;
+      UI.toast(data && data.sent ? 'Nudge sent to ' + c.name : c.name + " isn't set up for notifications yet");
+    } catch (e) {
+      console.warn('send-nudge failed', e);
+      UI.toast('Could not send nudge — try again');
+    }
   }
   function coachClientTip(c) {
     if (c.status === 'At risk') return `${c.name} is at ${c.pace}% and hasn't checked in recently. Call today — reset one keystone habit (the morning call block).`;
@@ -609,6 +626,7 @@
       s.settings.eodTime = $('r-eod').value || '17:00';
       s.settings.remindersEnabled = true; S.save();
       if ('Notification' in window && Notification.permission !== 'granted') { try { await Notification.requestPermission(); } catch (e) {} }
+      if (global.Push) Push.subscribe();
       scheduleReminders(); UI.closeSheet(); UI.toast('Reminders enabled');
     });
   }
@@ -655,10 +673,33 @@
     downloadBlob(new Blob([ics], { type: 'text/calendar' }), 'elite-tracker-reminders.ics');
     UI.toast('Calendar reminders downloaded');
   }
-  function ev(uid, start, title, desc) {
-    return ['BEGIN:VEVENT', `UID:${uid}@elitetracker`, `DTSTART:${start}`, `RRULE:FREQ=DAILY`, `SUMMARY:${title}`, `DESCRIPTION:${desc}`, 'BEGIN:VALARM', 'TRIGGER:PT0M', 'ACTION:DISPLAY', `DESCRIPTION:${title}`, 'END:VALARM', 'END:VEVENT'].join('\r\n');
+  function ev(uid, start, title, desc, repeatDaily) {
+    return ['BEGIN:VEVENT', `UID:${uid}@elitetracker`, `DTSTART:${start}`,
+      repeatDaily === false ? null : 'RRULE:FREQ=DAILY',
+      `SUMMARY:${title}`, `DESCRIPTION:${desc}`, 'BEGIN:VALARM', 'TRIGGER:PT0M', 'ACTION:DISPLAY', `DESCRIPTION:${title}`, 'END:VALARM', 'END:VEVENT']
+      .filter(Boolean).join('\r\n');
   }
   const pad = (n) => String(n).padStart(2, '0');
+
+  // Same download-an-.ics approach as the recurring reminders above, but
+  // for today's actual planned focus blocks (real times, one-off events)
+  // rather than a generic daily nudge — works with Google Calendar, Apple
+  // Calendar, Outlook, anything that reads .ics, without needing OAuth
+  // scopes or a live API integration.
+  function exportFocusICS() {
+    const d = S.dayRecord();
+    const items = (d.focus || []).filter((f) => f.time && f.text);
+    if (!items.length) { UI.toast('No timed focus tasks today'); return; }
+    const today = new Date();
+    const events = items.map((f, idx) => {
+      const [h, m] = (f.time || '09:00').split(':').map(Number);
+      const stamp = `${today.getFullYear()}${pad(today.getMonth() + 1)}${pad(today.getDate())}T${pad(h)}${pad(m)}00`;
+      return ev(`elite-focus-${S.todayKey()}-${idx}`, stamp, f.text, "From today's ELITE Tracker focus list.", false);
+    });
+    const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//ELITE Tracker//EN', ...events, 'END:VCALENDAR'].join('\r\n');
+    downloadBlob(new Blob([ics], { type: 'text/calendar' }), `elite-tracker-focus-${S.todayKey()}.ics`);
+    UI.toast("Today's focus added to calendar");
+  }
 
   /* ---------- in-app reminder scheduling ---------- */
   let reminderCheck = null;

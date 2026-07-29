@@ -18,6 +18,12 @@
   const SUPABASE_URL = 'https://qvxorxlfmsgtazrfxsnj.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_aeadjb0y0sHGjinC4MpNEg_QqmeWrU1';
 
+  // Web Push's public VAPID key — like the anon key, this is meant to ship
+  // client-side (it identifies the sender, it doesn't authorize anything).
+  // Its private counterpart lives only in the send-nudge Edge Function's
+  // secrets. See BACKEND_SETUP.md for how this pair was generated.
+  const VAPID_PUBLIC_KEY = 'BNAZgRFt9BY_HGEcpCGfwIUhp85lY7gboO7fgXcmvGPNw9zmnf5vWg1j0xZss-bcwvF8ZRupP4wlqv0ok0KaR8k';
+
   function isConfigured() {
     return SUPABASE_URL.indexOf('YOUR_SUPABASE') !== 0 && SUPABASE_ANON_KEY.indexOf('YOUR_SUPABASE') !== 0;
   }
@@ -32,5 +38,5 @@
     return client;
   }
 
-  global.Supa = { getClient, isConfigured };
+  global.Supa = { getClient, isConfigured, VAPID_PUBLIC_KEY };
 })(window);
