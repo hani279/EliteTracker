@@ -665,6 +665,7 @@
      ============================================================ */
   function coachDashboard() {
     const s = S.get(); const r = s.coachRoster;
+    if (!r.length) return coachEmptyState();
     const onTrack = r.filter((c) => c.status === 'On track').length;
     const atRisk = r.filter((c) => c.status === 'At risk').length;
     const checkins = r.filter((c) => /Today/.test(c.last)).length;
@@ -690,8 +691,9 @@
 
   function coachClients() {
     const s = S.get();
+    if (!s.coachRoster.length) return coachEmptyState();
     return `<section class="screen active">
-      <div class="card"><p class="subtle" style="margin:0">Full client roster. Each agent's data, reports and voice notes roll up here. (Cloud sync arrives in the next phase — for now this shows the demo roster.)</p></div>
+      <div class="card"><p class="subtle" style="margin:0">Full client roster — each agent's own pace, streak and check-ins, pulled live from their data.</p></div>
       ${s.coachRoster.map((c) => `<div class="card" style="display:flex;align-items:center;gap:12px" data-act="coach-client:${esc(c.name)}">
         <div class="avatar lg">${initials(c.name)}</div>
         <div style="flex:1"><div style="font-weight:600">${esc(c.name)}</div><div class="subtle">${esc(c.type)} · ${c.pace}% pace · ${c.streak}-day streak</div></div>
@@ -702,14 +704,27 @@
 
   function coachAlerts() {
     const s = S.get();
+    if (!s.coachRoster.length) return coachEmptyState();
     return `<section class="screen active">
-      <div class="card"><p class="subtle" style="margin:0">Flagged automatically from missed entries, pace and check-ins.</p></div>
-      ${(s.demoAlerts || []).map((a) => `<div class="card" style="display:flex;align-items:center;gap:10px">
+      <div class="card"><p class="subtle" style="margin:0">Flagged automatically from pace and check-ins.</p></div>
+      ${(s.demoAlerts || []).length ? s.demoAlerts.map((a) => `<div class="card" style="display:flex;align-items:center;gap:10px">
         <span class="rec-dot" style="background:${a.tone === 'green' ? 'var(--green)' : a.tone === 'amber' ? 'var(--amber)' : 'var(--clay)'};animation:none"></span>
         <div style="flex:1"><div style="font-weight:600">${esc(a.name)} <span class="tag ${a.tone === 'green' ? 'green' : a.tone === 'amber' ? 'amber' : 'red'}" style="margin-left:4px">${esc(a.kind)}</span></div>
         <div class="subtle">${esc(a.text)}</div></div>
         <button class="btn outline sm" data-act="coach-client:${esc(a.name)}">Review</button>
-      </div>`).join('')}
+      </div>`).join('') : emptyState('No alerts — everyone is on track.')}
+    </section>`;
+  }
+
+  function coachEmptyState() {
+    const s = S.get();
+    return `<section class="screen active">
+      <div class="card" style="text-align:center;padding:32px 20px">
+        ${Icons.svg('users', { size: 28 })}
+        <h3 style="margin:12px 0 6px">No agents linked yet</h3>
+        <p class="subtle" style="margin:0 0 14px">Share your coach code so agents can join your roster.</p>
+        <div class="kv" style="justify-content:center;gap:8px"><span class="tag gold" style="font-family:var(--mono);font-size:15px;padding:6px 14px">${esc(s.profile.coachCode || '—')}</span></div>
+      </div>
     </section>`;
   }
 

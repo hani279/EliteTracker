@@ -153,8 +153,116 @@
     const { data: reports } = await c.from('reports_log').select('*').eq('profile_id', pid).order('created_at', { ascending: false });
     if (reports && reports.length) s.reportsLog = reports.map((r) => ({ id: r.id, type: r.type, rangeLabel: r.range_label, score: r.score, date: Date.parse(r.created_at) || Date.now() }));
 
+    if (profileRow && profileRow.role === 'coach') await pullRoster(c, pid, s);
+
     suppressNextPush = true;
     S.save();
+  }
+
+  /* ---------- coach roster: derived from linked agents' own data ----------
+     A coach's roster isn't its own table — it's read straight off the
+     agents' profiles + day_records (the RLS "coach reads linked agent
+     X" policies are what make this safe: the query below only ever
+     returns rows for agents whose coach_id is this coach). Pace/streak
+     use the same math as intelligence.js's aggregate()/streak(), just
+     evaluated against a fetched profile_id -> day map instead of the
+     local Store, since coaches don't have their agents' data locally. */
+  async function pullRoster(c, pid, s) {
+    const { data: agents } = await c.from('profiles').select('id,name,vertical,targets,settings').eq('coach_id', pid);
+    if (!agents || !agents.length) { s.coachRoster = []; s.demoAlerts = []; return; }
+
+    const ids = agents.map((a) => a.id);
+    const since = S.addDays(S.todayKey(), -60);
+    const { data: records } = await c.from('day_records').select('profile_id,day,numbers,logged,updated_at').in('profile_id', ids).gte('day', since);
+    const byAgent = {};
+    ids.forEach((id) => { byAgent[id] = {}; });
+    (records || []).forEach((r) => { byAgent[r.profile_id][r.day] = r; });
+
+    s.coachRoster = agents.map((a) => rosterEntry(a, byAgent[a.id] || {}));
+    s.demoAlerts = buildAlerts(s.coachRoster);
+  }
+
+  function rosterEntry(agent, dayMap) {
+    const Data = global.Data;
+    const vKey = agent.vertical === 'sales' ? 'sales' : 'realestate';
+    const defs = (Data && Data.VERTICALS[vKey].activity) || [];
+    const targets = agent.targets || {};
+    const settings = agent.settings || {};
+    const assumeMin = settings.assumeMinimums !== false;
+    const today = S.todayKey();
+    const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
+    const isWeekend = (k) => [0, 6].includes(S.parseKey(k).getDay());
+
+    // 7-day pace, same adaptive-minimum logic as intelligence.js's aggregate()
+    let totalActual = 0, totalTarget = 0;
+    for (let i = 6; i >= 0; i--) {
+      const k = S.addDays(today, -i);
+      const rec = dayMap[k];
+      const isPast = S.parseKey(k) <= startOfToday;
+      const weekend = isWeekend(k);
+      const logged = rec && rec.logged && Object.keys(rec.numbers || {}).length > 0;
+      defs.forEach((m) => {
+        const tgt = targets[m.key] ?? m.target;
+        if (!weekend && isPast) totalTarget += tgt;
+        if (logged) totalActual += (rec.numbers[m.key] || 0);
+        else if (!weekend && isPast && assumeMin) totalActual += Math.round(tgt * 0.5);
+      });
+    }
+    const pace = totalTarget > 0 ? Math.round((totalActual / totalTarget) * 100) : 0;
+
+    // consecutive logged workdays, walking back from today
+    let streakCount = 0, k = today;
+    for (let i = 0; i < 60; i++) {
+      const rec = dayMap[k];
+      if (isWeekend(k)) { k = S.addDays(k, -1); continue; }
+      const logged = rec && rec.logged && Object.keys(rec.numbers || {}).length > 0;
+      if (i === 0 && !logged) { k = S.addDays(k, -1); continue; }
+      if (logged) { streakCount++; k = S.addDays(k, -1); } else break;
+    }
+
+    // most recent logged day, for "last check-in" + at-risk detection
+    let lastKey = null, lastRow = null;
+    Object.keys(dayMap).sort().reverse().some((dk) => {
+      const rec = dayMap[dk];
+      if (rec && rec.logged && Object.keys(rec.numbers || {}).length > 0) { lastKey = dk; lastRow = rec; return true; }
+      return false;
+    });
+    const daysSince = lastKey ? Math.round((S.parseKey(today) - S.parseKey(lastKey)) / 86400000) : Infinity;
+
+    let status;
+    if (daysSince >= 3) status = 'At risk';
+    else if (pace >= 75) status = 'On track';
+    else if (pace >= 45) status = 'Watch';
+    else status = 'At risk';
+
+    return {
+      name: agent.name || 'Unnamed', type: vKey === 'sales' ? 'Sales' : 'Real Estate',
+      status, pace, streak: streakCount, last: fmtLastCheckin(lastKey, lastRow && lastRow.updated_at),
+    };
+  }
+
+  function fmtLastCheckin(lastKey, updatedAt) {
+    if (!lastKey) return 'No check-ins yet';
+    const today = S.todayKey();
+    if (lastKey === today) {
+      const d = new Date(updatedAt || Date.now());
+      return 'Today ' + d.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' });
+    }
+    if (lastKey === S.addDays(today, -1)) return 'Yesterday';
+    const days = Math.round((S.parseKey(today) - S.parseKey(lastKey)) / 86400000);
+    return `${days} days ago`;
+  }
+
+  function buildAlerts(roster) {
+    return roster.filter((c) => c.status !== 'On track').map((c) => ({
+      name: c.name,
+      kind: c.status === 'At risk' ? 'AT RISK' : 'WATCH',
+      tone: c.status === 'At risk' ? 'red' : 'amber',
+      text: c.status === 'At risk'
+        ? `Pace at ${c.pace}% of target — last check-in ${c.last.toLowerCase()}.`
+        : `Pace slipping to ${c.pace}% this week — worth a nudge.`,
+      when: c.last,
+    }));
   }
 
   S.onSave(scheduleSync);
