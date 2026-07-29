@@ -165,7 +165,7 @@
 
     // 5) overall pace
     if (agg.pace >= 100) tips.push({ tone: 'good', text: `You're over target at ${agg.pace}% for this period. Bank the momentum — add one extra prospecting block to stretch the lead.` });
-    else if (agg.pace >= 85) tips.push({ tone: 'good', text: `On pace at ${agg.pace}%. Close the small gaps and you finish the period green.` });
+    else if (agg.pace >= 85) tips.push({ tone: 'good', text: `On pace at ${agg.pace}%. Close the small gaps and you finish the period on target.` });
 
     if (!tips.length) tips.push({ tone: 'good', text: 'Solid, balanced week. Pick one metric to push 10% higher and everything downstream follows.' });
     return tips;

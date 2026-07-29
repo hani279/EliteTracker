@@ -14,13 +14,29 @@
   let installPrompt = null;
   window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installPrompt = e; });
 
+  /* ---------- theme ---------- */
+  function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', theme === 'light' ? '#f2f3f6' : '#0b1426');
+  }
+  function toggleTheme() {
+    const s = S.get();
+    s.settings.theme = s.settings.theme === 'light' ? 'dark' : 'light';
+    S.save(); applyTheme(s.settings.theme); rerender();
+  }
+
   /* ---------- init ---------- */
   S.load();
+  applyTheme(S.get().settings.theme || 'dark');
   document.addEventListener('DOMContentLoaded', boot);
   if (document.readyState !== 'loading') boot();
   let booted = false;
-  function boot() {
+  async function boot() {
     if (booted) return; booted = true;
+    await Auth.init();
+    Auth.onChange(() => UI.render());
+    if (Auth.getSession()) { try { await Sync.pull(); } catch (e) { console.warn('sync pull failed', e); } }
     UI.render();
     scheduleReminders();
   }
@@ -44,16 +60,28 @@
   function handle(act, el, e) {
     const [cmd, a, b] = act.split(':');
 
+    // ---- auth ----
+    if (cmd === 'auth-mode') { UI.authMode = a; UI.authError = ''; UI.authInfo = ''; UI.renderOnboarding(); return; }
+    if (cmd === 'auth-forgot') { UI.toast('Password reset needs a backend — coming soon.'); return; }
+    if (cmd === 'auth-google') return authGoogle(el);
+    if (cmd === 'auth-submit') return authSubmit(el);
+    if (cmd === 'log-out') return logOut();
+
     // ---- onboarding ----
+    if (cmd === 'onb-role') { UI.onbTmp.role = a; UI.onbStep = 0; UI.renderOnboarding(); return; }
     if (cmd === 'onb-vert') { UI.onbTmp.vertical = a; UI.renderOnboarding(); return; }
     if (cmd === 'onb-next') { UI.captureOnb(); UI.onbStep = UI.onbStep + 1; UI.renderOnboarding(); return; }
-    if (cmd === 'onb-back') { UI.captureOnb(); UI.onbStep = Math.max(0, UI.onbStep - 1); UI.renderOnboarding(); return; }
+    if (cmd === 'onb-back') {
+      UI.captureOnb();
+      if (UI.onbStep === 0) UI.onbTmp.role = null; else UI.onbStep = UI.onbStep - 1;
+      UI.renderOnboarding(); return;
+    }
     if (cmd === 'onb-finish') { UI.finishOnboarding(); return; }
 
     // ---- navigation ----
-    if (cmd === 'nav') { UI.current = a; S.get().mode = 'agent'; rerender(); return; }
+    if (cmd === 'nav') { UI.current = a; rerender(); return; }
     if (cmd === 'cnav') { UI.coachView = a; rerender(); return; }
-    if (cmd === 'mode') { S.get().mode = a; rerender(); return; }
+    if (cmd === 'toggle-theme') return toggleTheme();
 
     // ---- menu ----
     if (cmd === 'open-menu') return openMenu();
@@ -117,6 +145,48 @@
     if (cmd === 'reset-app') return resetApp();
   }
 
+  /* ---------- auth ---------- */
+  async function authSubmit(btn) {
+    const isSignup = UI.authMode === 'signup';
+    const email = ($('auth-email') || {}).value || '';
+    const password = ($('auth-password') || {}).value || '';
+    if (btn) { btn.setAttribute('disabled', ''); btn.style.opacity = '.6'; btn.textContent = isSignup ? 'Creating account…' : 'Logging in…'; }
+    const result = isSignup
+      ? await Auth.signUpEmail(($('auth-name') || {}).value || '', email, password)
+      : await Auth.signInEmail(email, password);
+    if (result.error) {
+      UI.authError = result.error; UI.renderOnboarding(); return;
+    }
+    if (result.needsConfirmation) {
+      UI.authError = '';
+      UI.authMode = 'login';
+      UI.authInfo = `Check ${result.email} for a link to confirm your account, then log in here.`;
+      UI.renderOnboarding();
+      return;
+    }
+    UI.authError = ''; UI.authInfo = '';
+    if (isSignup && !UI.onbTmp.name) UI.onbTmp.name = result.user.name;
+    UI.render();
+  }
+  async function authGoogle(btn) {
+    if (btn) { btn.setAttribute('disabled', ''); btn.style.opacity = '.6'; }
+    const result = await Auth.signInGoogle();
+    if (result && result.error) {
+      if (btn) { btn.removeAttribute('disabled'); btn.style.opacity = ''; }
+      UI.authError = result.error; UI.renderOnboarding(); return;
+    }
+    // Success means the browser is already navigating to Google — nothing
+    // else to do here; onAuthStateChange picks up the session on return.
+  }
+  async function logOut() {
+    UI.closeSheet();
+    await Auth.signOut();
+    UI.authMode = 'login';
+    UI.authError = '';
+    UI.render();
+    UI.toast('Logged out');
+  }
+
   /* ---------- number stepper ---------- */
   function stepNumber(key, delta) {
     const d = S.dayRecord();
@@ -133,9 +203,9 @@
     UI.openSheet(`<h3>${UI.esc(def.label)}</h3>
       <p class="subtle">How many today?</p>
       <div class="stepper" style="justify-content:center;gap:16px;margin:16px 0">
-        <button class="minus" data-act="outnum:${key}:-">−</button>
+        <button class="minus" data-act="outnum:${key}:-">${Icons.svg('minus', { size: 14 })}</button>
         <div class="val" id="out-val" style="font-size:26px">${d.outcomes[key] || 0}</div>
-        <button data-act="outnum:${key}:+">＋</button>
+        <button data-act="outnum:${key}:+">${Icons.svg('plus', { size: 14 })}</button>
       </div>
       <button class="btn gold" data-act="close-sheet">Done</button>`);
     // local handlers for outnum
@@ -164,7 +234,7 @@
     const d = S.dayRecord(); const pace = Intel.todayPace();
     const done = d.focus.filter((f) => f.done).length;
     UI.openSheet(`<h3>End-of-day review</h3>
-      <div class="callout">You hit <b>${pace}%</b> of today's numbers and completed <b>${done}/${d.focus.length}</b> focus tasks.</div>
+      <div class="callout">${Icons.svg('target', { size: 15 })}<span>You hit <b>${pace}%</b> of today's numbers and completed <b>${done}/${d.focus.length}</b> focus tasks.</span></div>
       <div class="field" style="margin-top:14px"><label>What did you do well?</label><textarea class="textarea" id="eod-did">${UI.esc(d.summary.did)}</textarea></div>
       <div class="field"><label>What did you learn?</label><textarea class="textarea" id="eod-learned">${UI.esc(d.summary.learned)}</textarea></div>
       <div class="field"><label>Where did you struggle?</label><textarea class="textarea" id="eod-struggled">${UI.esc(d.summary.struggled)}</textarea></div>
@@ -201,7 +271,7 @@
     UI.openSheet(`<h3>Voice notes</h3>
       <p class="subtle">One quick note — what did you do, learn, struggle with. Stored on your device; transcription & auto-summary to your coach arrive with cloud sync.</p>
       <div id="rec-ui" style="text-align:center;margin:18px 0">
-        <button class="btn gold" id="rec-btn" data-act="rec-start">🎙 Start recording</button>
+        <button class="btn gold" id="rec-btn" data-act="rec-start">${Icons.svg('mic', { size: 15 })} Start recording</button>
         <div id="rec-time" class="subtle" style="margin-top:8px"></div>
       </div>
       <div class="section-title">Today's notes</div>
@@ -211,8 +281,8 @@
   function voiceListHtml(d) {
     if (!d.voiceNotes.length) return '<p class="subtle">No voice notes yet.</p>';
     return d.voiceNotes.map((v) => `<div class="vn">
-      <div class="play" data-act="vn-play:${v.id}">▶</div>
-      <div style="flex:1"><div style="font-weight:700;font-size:13px">Voice note</div>
+      <div class="play" data-act="vn-play:${v.id}">${Icons.svg('play', { size: 13 })}</div>
+      <div style="flex:1"><div style="font-weight:600;font-size:13px">Voice note</div>
       <div class="subtle" style="font-size:11px">${new Date(v.ts).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' })} · ${v.durationSec || 0}s</div></div>
       <button class="tag red" data-act="vn-del:${v.id}">Delete</button></div>`).join('');
   }
@@ -234,14 +304,14 @@
         UI.toast('Voice note saved');
       };
       mediaRecorder.start(); recSecs = 0;
-      const btn = $('rec-btn'); if (btn) { btn.textContent = '⏹ Stop recording'; btn.setAttribute('data-act', 'rec-stop'); }
+      const btn = $('rec-btn'); if (btn) { btn.innerHTML = Icons.svg('stop', { size: 15 }) + ' Stop recording'; btn.setAttribute('data-act', 'rec-stop'); }
       recTimer = setInterval(() => { recSecs++; const t = $('rec-time'); if (t) t.innerHTML = `<span class="rec-dot"></span> Recording ${recSecs}s`; }, 1000);
     } catch (err) { UI.toast('Mic permission denied'); }
   }
   function stopRecording() {
     if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
     clearInterval(recTimer);
-    const btn = $('rec-btn'); if (btn) { btn.textContent = '🎙 Start recording'; btn.setAttribute('data-act', 'rec-start'); }
+    const btn = $('rec-btn'); if (btn) { btn.innerHTML = Icons.svg('mic', { size: 15 }) + ' Start recording'; btn.setAttribute('data-act', 'rec-start'); }
     const t = $('rec-time'); if (t) t.textContent = '';
   }
   async function playVoice(id) {
@@ -423,7 +493,7 @@
       <div class="kv"><span class="k">Week pace</span><span class="v">${c.pace}%</span></div>
       <div class="kv"><span class="k">Streak</span><span class="v">${c.streak} days</span></div>
       <div class="kv"><span class="k">Last check-in</span><span class="v">${UI.esc(c.last || '—')}</span></div>
-      <div class="callout" style="margin-top:14px">${coachClientTip(c)}</div>
+      <div class="callout" style="margin-top:14px">${Icons.svg('target', { size: 15 })}<span>${coachClientTip(c)}</span></div>
       <div class="btn-row" style="margin-top:14px"><button class="btn outline" data-act="close-sheet">Close</button>
       <button class="btn gold" id="cc-msg">Send nudge</button></div>`);
     $('cc-msg').addEventListener('click', () => { UI.closeSheet(); UI.toast('Nudge sent to ' + c.name); });
@@ -437,17 +507,23 @@
   /* ---------- menu / settings ---------- */
   function openMenu() {
     const s = S.get();
+    const session = Auth.getSession();
     UI.openSheet(`<h3>Menu</h3>
-      <button class="choice" data-act="nav:goals">◆ Goals & build framework</button>
-      <button class="choice" id="m-reminders">🔔 Reminders — ${s.settings.remindersEnabled ? 'On' : 'Off'} (${s.settings.reminderTime} / ${s.settings.eodTime})</button>
-      <button class="choice" id="m-minimums">⚙︎ Adapt to missing data — ${s.settings.assumeMinimums ? 'On (assume minimums)' : 'Off'}</button>
-      <button class="choice" data-act="switch-vertical">⇄ Switch version — currently ${Data.vertical().label}</button>
-      <button class="choice" data-act="install-app">⤓ Install app on this phone</button>
-      <button class="choice" data-act="export-ics">📅 Add daily reminder to calendar</button>
-      <button class="choice" data-act="backup-export">⭳ Export backup</button>
-      <button class="choice" data-act="reset-app" style="color:var(--red)">↺ Reset all data</button>`);
+      ${session ? `<p class="subtle" style="margin:-8px 0 16px">Signed in as ${UI.esc(session.email)}${session.provider === 'google' ? ' · Google' : ''}</p>` : ''}
+      <button class="choice icon-row" id="m-theme">${Icons.svg(s.settings.theme === 'light' ? 'sun' : 'moon', { size: 17 })}<span>Appearance — ${s.settings.theme === 'light' ? 'Light' : 'Dark'}</span></button>
+      ${s.mode === 'coach' ? `<button class="choice icon-row" style="cursor:default"><span style="display:flex;align-items:center;color:var(--gold-ink)">${Icons.svg('target', { size: 17 })}</span><span>Your coach code — ${UI.esc(s.profile.coachCode || '—')}</span></button>` : ''}
+      ${s.mode === 'agent' ? `<button class="choice icon-row" data-act="nav:goals">${Icons.svg('flag', { size: 17 })}<span>Goals & build framework</span></button>` : ''}
+      <button class="choice icon-row" id="m-reminders">${Icons.svg('bell', { size: 17 })}<span>Reminders — ${s.settings.remindersEnabled ? 'On' : 'Off'} (${s.settings.reminderTime} / ${s.settings.eodTime})</span></button>
+      ${s.mode === 'agent' ? `<button class="choice icon-row" id="m-minimums">${Icons.svg('settings', { size: 17 })}<span>Adapt to missing data — ${s.settings.assumeMinimums ? 'On (assume minimums)' : 'Off'}</span></button>` : ''}
+      ${s.mode === 'agent' ? `<button class="choice icon-row" data-act="switch-vertical">${Icons.svg('swap', { size: 17 })}<span>Switch version — currently ${Data.vertical().label}</span></button>` : ''}
+      <button class="choice icon-row" data-act="install-app">${Icons.svg('download', { size: 17 })}<span>Install app on this phone</span></button>
+      <button class="choice icon-row" data-act="export-ics">${Icons.svg('calendar', { size: 17 })}<span>Add daily reminder to calendar</span></button>
+      <button class="choice icon-row" data-act="backup-export">${Icons.svg('upload', { size: 17 })}<span>Export backup</span></button>
+      <button class="choice icon-row" data-act="log-out">${Icons.svg('logout', { size: 17 })}<span>Log out</span></button>
+      <button class="choice icon-row" data-act="reset-app" style="color:var(--clay)">${Icons.svg('reset', { size: 17 })}<span>Reset all data</span></button>`);
+    $('m-theme').addEventListener('click', () => { toggleTheme(); openMenu(); });
     $('m-reminders').addEventListener('click', remindersSheet);
-    $('m-minimums').addEventListener('click', () => { s.settings.assumeMinimums = !s.settings.assumeMinimums; S.save(); UI.toast('Adaptive handling ' + (s.settings.assumeMinimums ? 'on' : 'off')); openMenu(); });
+    if ($('m-minimums')) $('m-minimums').addEventListener('click', () => { s.settings.assumeMinimums = !s.settings.assumeMinimums; S.save(); UI.toast('Adaptive handling ' + (s.settings.assumeMinimums ? 'on' : 'off')); openMenu(); });
   }
   function remindersSheet() {
     const s = S.get();
@@ -455,7 +531,7 @@
       <p class="subtle">A morning nudge to set your focus, and an end-of-day nudge to log numbers + voice note. Works while the app is installed and open; add to your calendar for guaranteed alerts.</p>
       <div class="field" style="margin-top:12px"><label>Morning reminder</label><input class="input" id="r-morning" type="time" value="${s.settings.reminderTime}"></div>
       <div class="field"><label>End-of-day reminder</label><input class="input" id="r-eod" type="time" value="${s.settings.eodTime}"></div>
-      <div class="btn-row"><button class="btn outline" data-act="export-ics">📅 Add to calendar</button>
+      <div class="btn-row"><button class="btn outline" data-act="export-ics">${Icons.svg('calendar', { size: 15 })} Add to calendar</button>
       <button class="btn gold" id="r-save">Enable reminders</button></div>`);
     $('r-save').addEventListener('click', async () => {
       s.settings.reminderTime = $('r-morning').value || '08:00';
@@ -482,7 +558,7 @@
     });
   }
   function resetApp() {
-    UI.openSheet(`<h3 style="color:var(--red)">Reset all data?</h3>
+    UI.openSheet(`<h3 style="color:var(--clay)">Reset all data?</h3>
       <p class="subtle">This clears everything on this device and restarts onboarding. Export a backup first if unsure.</p>
       <div class="btn-row" style="margin-top:14px"><button class="btn outline" data-act="close-sheet">Cancel</button>
       <button class="btn danger" id="rs-go">Reset everything</button></div>`);
@@ -533,6 +609,17 @@
     UI.toast(title + ' — ' + body);
   }
 
+  /* ---------- live-filter inputs (re-render without losing focus/cursor) ---------- */
+  function pipeSearch(value) {
+    UI.pipeSearch = value;
+    const active = document.activeElement;
+    const id = active && active.id;
+    const pos = active && active.selectionStart;
+    UI.render();
+    const el = id && $(id);
+    if (el) { el.focus(); if (pos != null) el.setSelectionRange(pos, pos); }
+  }
+
   // expose a few for debugging
-  global.App = { rerender, scheduleReminders };
+  global.App = { rerender, scheduleReminders, pipeSearch };
 })(window);

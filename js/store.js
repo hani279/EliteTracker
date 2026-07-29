@@ -26,7 +26,7 @@
       version: 1,
       onboarded: false,
       mode: 'agent',            // 'agent' | 'coach'
-      profile: { name: '', coachName: 'Harry', vertical: 'realestate', role: '' },
+      profile: { name: '', coachName: 'Harry', coachCode: '', brand: '', vertical: 'realestate', role: '' },
       buildFramework: { goal: '', proof: '', steps: [] }, // Goal / Proof / Steps — build best agent
       goals: [],                // life & business goals grid
       targets: {},              // metricKey -> daily target (per vertical, seeded)
@@ -41,6 +41,7 @@
         eodTime: '17:00',
         assumeMinimums: true,   // adapt to missing data
         numbersDue: '17:00',
+        theme: 'dark',          // 'dark' | 'light'
       },
       reportsLog: [],           // {id,type,rangeLabel,date,score}
       coachRoster: [],          // demo roster for coach view
@@ -57,8 +58,11 @@
     } catch (e) { state = defaultState(); }
     return state;
   }
+  const saveListeners = [];
+  function onSave(fn) { saveListeners.push(fn); }
   function save() {
     try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { console.warn('save failed', e); }
+    saveListeners.forEach((fn) => { try { fn(state); } catch (e) { console.warn('save listener failed', e); } });
   }
   function get() { return state || load(); }
   function reset() { state = defaultState(); save(); }
@@ -82,7 +86,13 @@
     return s.days[key];
   }
 
-  const uid = () => Math.random().toString(36).slice(2, 9);
+  // Real UUIDs (not short random strings) so client-generated ids can be
+  // used directly as Supabase `uuid` primary keys with no server round-trip
+  // and no local-id-to-remote-id translation step.
+  const uid = () => (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  }));
 
   // ============================================================
   //  IndexedDB for voice-note audio blobs
@@ -127,7 +137,7 @@
   }
 
   global.Store = {
-    KEY, load, save, get, reset, replace, defaultState,
+    KEY, load, save, get, reset, replace, defaultState, onSave,
     dayRecord, uid,
     todayKey, parseKey, addDays, fmtDate, fmtShort,
     putAudio, getAudio, delAudio,

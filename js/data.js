@@ -200,8 +200,17 @@
     S.save();
   }
 
+  // Coach accounts don't log their own numbers — no vertical, targets,
+  // pipeline or goals to seed. Just the roster view they actually use.
+  function seedCoach() {
+    const s = S.get();
+    if (!s.coachRoster.length) s.coachRoster = DEMO_ROSTER.map((r) => ({ ...r }));
+    s.demoAlerts = DEMO_ALERTS;
+    S.save();
+  }
+
   global.Data = {
-    VERTICALS, vertical, activityDefs, outcomeDefs, seedTargets,
+    VERTICALS, vertical, activityDefs, outcomeDefs, seedTargets, seedCoach,
     DEFAULT_FOCUS, DEFAULT_GOALS, DEMO_ROSTER, DEMO_ALERTS,
     samplePipeline, sampleCRM, sampleSpecialOps,
     seedHistory, seedAll,

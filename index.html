@@ -10,13 +10,23 @@
 <meta name="apple-mobile-web-app-title" content="ELITE">
 <meta name="description" content="Input & activity tracker for coached sales and real estate agents.">
 <title>ELITE Tracker</title>
+<script>
+(function () {
+  try {
+    var raw = localStorage.getItem('elite_tracker_v1');
+    var s = raw ? JSON.parse(raw) : null;
+    var theme = (s && s.settings && s.settings.theme) || 'dark';
+    document.documentElement.setAttribute('data-theme', theme);
+  } catch (e) { document.documentElement.setAttribute('data-theme', 'dark'); }
+})();
+</script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" href="icons/favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/styles.css">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css?v=11">
 </head>
 <body>
   <div id="app">
@@ -39,10 +49,15 @@
   <!-- Toast -->
   <div id="toast" class="toast"></div>
 
-  <script src="js/store.js"></script>
-  <script src="js/data.js"></script>
-  <script src="js/intelligence.js"></script>
-  <script src="js/ui.js"></script>
-  <script src="js/app.js"></script>
+  <script src="js/icons.js?v=11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/supabase-client.js?v=11"></script>
+  <script src="js/auth.js?v=11"></script>
+  <script src="js/store.js?v=11"></script>
+  <script src="js/sync.js?v=11"></script>
+  <script src="js/data.js?v=11"></script>
+  <script src="js/intelligence.js?v=11"></script>
+  <script src="js/ui.js?v=11"></script>
+  <script src="js/app.js?v=11"></script>
 </body>
 </html>

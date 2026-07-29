@@ -9,7 +9,10 @@
   let current = 'today';       // agent view
   let coachView = 'dashboard'; // coach view
   let onbStep = 0;
-  const onbTmp = { vertical: null, name: '', coachName: 'Harry', goal: '', proof: '', steps: ['', '', ''] };
+  let authMode = 'signup';     // 'signup' | 'login'
+  let authError = '';
+  let authInfo = '';           // neutral/positive notice, e.g. "check your email"
+  const onbTmp = { role: null, vertical: null, name: '', coachName: 'Harry', coachCode: '', brand: '', coachCodeGen: '', goal: '', proof: '', steps: ['', '', ''] };
 
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -18,7 +21,7 @@
   function ring(pct, label, opt) {
     opt = opt || {}; const size = opt.size || 64;
     const r = (size - 8) / 2, c = 2 * Math.PI * r, off = c * (1 - Math.min(pct, 100) / 100);
-    const track = opt.light ? 'rgba(11,20,38,.10)' : 'rgba(255,255,255,.15)';
+    const track = 'var(--hairline)';
     const col = opt.color || 'var(--gold)';
     return `<div class="ringwrap" style="width:${size}px;height:${size}px">
       <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
@@ -49,11 +52,66 @@
      ============================================================ */
   function renderOnboarding() {
     const wrap = $('onboarding');
-    const steps = [stepVertical, stepProfile, stepBuild, stepGoal];
+    if (!Auth.getSession()) { wrap.innerHTML = renderAuthScreen(); return; }
+    if (!onbTmp.role) { wrap.innerHTML = renderRoleScreen(); return; }
+    const steps = onbTmp.role === 'coach' ? [stepCoachProfile, stepCoachCode] : [stepVertical, stepProfile, stepBuild, stepGoal];
     wrap.innerHTML = `<div class="onb">
       <div class="brand"><span class="dia"></span><span class="nm">ELITE</span><span class="tk">TRACKER</span></div>
       ${steps[onbStep]()}
       <div class="dots">${steps.map((_, i) => `<span class="d ${i === onbStep ? 'on' : ''}"></span>`).join('')}</div>
+    </div>`;
+  }
+
+  function renderRoleScreen() {
+    return `<div class="onb">
+      <div class="brand"><span class="dia"></span><span class="nm">ELITE</span><span class="tk">TRACKER</span></div>
+      <h2>How will you use ELITE Tracker?</h2>
+      <p class="lead">This decides what you see from here on — a daily tracker, or a coach's view across a roster.</p>
+      <button class="choice" data-act="onb-role:agent">
+        <div class="ct">I'm an Agent</div>
+        <div class="cs">Log daily numbers, get coached, track your own pipeline and goals.</div>
+      </button>
+      <button class="choice" data-act="onb-role:coach">
+        <div class="ct">I'm a Coach</div>
+        <div class="cs">See your roster's pace, get alerted when someone needs a nudge, review reports.</div>
+      </button>
+    </div>`;
+  }
+
+  /* ---------- auth (sign up / log in) ---------- */
+  function googleMark() {
+    return `<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+      <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/>
+      <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
+      <path fill="#FBBC05" d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332z"/>
+      <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 7.294C4.672 5.167 6.656 3.58 9 3.58z"/>
+    </svg>`;
+  }
+
+  function renderAuthScreen() {
+    const isSignup = authMode === 'signup';
+    return `<div class="onb">
+      <div class="brand"><span class="dia"></span><span class="nm">ELITE</span><span class="tk">TRACKER</span></div>
+      <h2>${isSignup ? 'Create your account' : 'Welcome back'}</h2>
+      <p class="lead">${isSignup ? 'Set up ELITE Tracker in a minute — your coach sees you show up from day one.' : 'Log in to pick up where you left off.'}</p>
+
+      <button class="btn-google" data-act="auth-google">${googleMark()}<span>Continue with Google</span></button>
+      <div class="divider"><span>or continue with email</span></div>
+
+      ${authInfo ? `<div class="callout green" style="margin-bottom:16px">${Icons.svg('check', { size: 15 })}<span>${esc(authInfo)}</span></div>` : ''}
+      <div class="card-light">
+        ${authError ? `<div class="callout red" style="margin:0 0 14px">${Icons.svg('target', { size: 15 })}<span>${esc(authError)}</span></div>` : ''}
+        ${isSignup ? `<div class="field"><label>Your name</label><input class="input" id="auth-name" placeholder="e.g. Jordan Avery"></div>` : ''}
+        <div class="field"><label>Email</label><input class="input" id="auth-email" type="email" autocomplete="email" placeholder="you@email.com"></div>
+        <div class="field" style="margin-bottom:0"><label>Password</label><input class="input" id="auth-password" type="password" autocomplete="${isSignup ? 'new-password' : 'current-password'}" placeholder="${isSignup ? 'At least 8 characters' : 'Your password'}"></div>
+      </div>
+
+      <div class="step-actions">
+        <button class="btn gold" data-act="auth-submit" style="flex:1">${isSignup ? 'Create account' : 'Log in'}</button>
+      </div>
+      <p class="lead" style="margin-top:18px;font-size:13px">${isSignup ? 'Already have an account?' : 'New here?'}
+        <a href="#" data-act="auth-mode:${isSignup ? 'login' : 'signup'}" style="color:var(--gold-ink);font-weight:600;text-decoration:none">${isSignup ? 'Log in' : 'Create one'}</a></p>
+      ${!isSignup ? `<p class="lead" style="margin-top:6px;font-size:12px"><a href="#" data-act="auth-forgot" style="color:var(--bone-faint);text-decoration:none">Forgot password?</a></p>` : ''}
     </div>`;
   }
 
@@ -69,6 +127,7 @@
         <div class="cs">Calls, social touches, first meetings, deals & pipeline.</div>
       </button>
       <div class="step-actions">
+        <button class="btn ghost" data-act="onb-back">Back</button>
         <button class="btn gold" data-act="onb-next" ${onbTmp.vertical ? '' : 'disabled style="opacity:.5"'}>Continue</button>
       </div>`;
   }
@@ -79,12 +138,49 @@
       <div class="card-light">
         <div class="field"><label>Your name</label>
           <input class="input" id="onb-name" placeholder="e.g. Jordan Avery" value="${esc(onbTmp.name)}"></div>
-        <div class="field" style="margin-bottom:0"><label>Your coach's name</label>
+        <div class="field"><label>Your coach's name</label>
           <input class="input" id="onb-coach" placeholder="e.g. Harry" value="${esc(onbTmp.coachName)}"></div>
+        <div class="field" style="margin-bottom:0"><label>Coach access code (optional)</label>
+          <input class="input" id="onb-code" placeholder="e.g. HARRY-4821" value="${esc(onbTmp.coachCode)}"></div>
       </div>
       <div class="step-actions">
         <button class="btn ghost" data-act="onb-back">Back</button>
         <button class="btn gold" data-act="onb-next">Continue</button>
+      </div>`;
+  }
+
+  /* ---------- coach onboarding ---------- */
+  function generateCoachCode(name) {
+    const base = (name || 'coach').trim().split(/\s+/)[0].toUpperCase().replace(/[^A-Z]/g, '') || 'COACH';
+    return `${base}-${Math.floor(1000 + Math.random() * 9000)}`;
+  }
+
+  function stepCoachProfile() {
+    return `<h2>Set up your coaching profile</h2>
+      <p class="lead">This is what your clients see on their nudges and reports.</p>
+      <div class="card-light">
+        <div class="field"><label>Your name</label>
+          <input class="input" id="onb-coachname" placeholder="e.g. Harry Whitfield" value="${esc(onbTmp.name)}"></div>
+        <div class="field" style="margin-bottom:0"><label>Business / brand name (optional)</label>
+          <input class="input" id="onb-brand" placeholder="e.g. Whitfield Coaching" value="${esc(onbTmp.brand)}"></div>
+      </div>
+      <div class="step-actions">
+        <button class="btn ghost" data-act="onb-back">Back</button>
+        <button class="btn gold" data-act="onb-next">Continue</button>
+      </div>`;
+  }
+
+  function stepCoachCode() {
+    if (!onbTmp.coachCodeGen) onbTmp.coachCodeGen = generateCoachCode(onbTmp.name);
+    return `<h2>You're set</h2>
+      <p class="lead">Share this code with your clients — they'll enter it when they sign up so their numbers reach you.</p>
+      <div class="card-light" style="text-align:center">
+        <div class="section-title" style="margin-bottom:8px">Your coach code</div>
+        <div style="font-family:var(--mono);font-size:26px;letter-spacing:2px;color:var(--gold-ink);font-weight:500">${esc(onbTmp.coachCodeGen)}</div>
+      </div>
+      <div class="step-actions">
+        <button class="btn ghost" data-act="onb-back">Back</button>
+        <button class="btn gold" data-act="onb-finish">Enter ELITE Tracker</button>
       </div>`;
   }
 
@@ -121,7 +217,15 @@
   }
 
   function captureOnb() {
-    if (onbStep === 1) { onbTmp.name = ($('onb-name') || {}).value || ''; onbTmp.coachName = ($('onb-coach') || {}).value || 'Harry'; }
+    if (onbTmp.role === 'coach') {
+      if (onbStep === 0) { onbTmp.name = ($('onb-coachname') || {}).value || ''; onbTmp.brand = ($('onb-brand') || {}).value || ''; }
+      return;
+    }
+    if (onbStep === 1) {
+      onbTmp.name = ($('onb-name') || {}).value || '';
+      onbTmp.coachName = ($('onb-coach') || {}).value || 'Harry';
+      onbTmp.coachCode = ($('onb-code') || {}).value || '';
+    }
     if (onbStep === 2) { onbTmp.did = ($('onb-did') || {}).value || ''; }
     if (onbStep === 3) {
       onbTmp.goal = ($('onb-goal') || {}).value || '';
@@ -133,17 +237,39 @@
   function finishOnboarding() {
     captureOnb();
     const s = S.get();
-    s.profile.name = onbTmp.name || 'Agent';
-    s.profile.coachName = onbTmp.coachName || 'Harry';
-    s.buildFramework = { goal: onbTmp.goal, proof: onbTmp.proof, steps: onbTmp.steps.filter(Boolean) };
-    if (onbTmp.did) { const t = S.dayRecord(S.todayKey()); t.summary.did = onbTmp.did; }
-    Data.seedAll(onbTmp.vertical);
-    Data.seedHistory();
+    if (onbTmp.role === 'coach') {
+      s.mode = 'coach';
+      s.profile.name = onbTmp.name || 'Coach';
+      s.profile.role = 'Head Coach';
+      s.profile.brand = onbTmp.brand || '';
+      s.profile.coachCode = onbTmp.coachCodeGen || '';
+      Data.seedCoach();
+    } else {
+      s.mode = 'agent';
+      s.profile.name = onbTmp.name || 'Agent';
+      s.profile.coachName = onbTmp.coachName || 'Harry';
+      s.profile.coachCode = onbTmp.coachCode || '';
+      s.buildFramework = { goal: onbTmp.goal, proof: onbTmp.proof, steps: onbTmp.steps.filter(Boolean) };
+      if (onbTmp.did) { const t = S.dayRecord(S.todayKey()); t.summary.did = onbTmp.did; }
+      Data.seedAll(onbTmp.vertical);
+      Data.seedHistory();
+    }
     s.onboarded = true;
     S.save();
     $('onboarding').style.display = 'none';
     $('main').style.display = 'block';
     render();
+
+    // Best-effort sync to the backend, if one is connected — local state
+    // above is already the source of truth for this session either way.
+    Auth.syncProfile({
+      role: onbTmp.role,
+      name: s.profile.name,
+      vertical: onbTmp.role === 'coach' ? null : onbTmp.vertical,
+      brand: s.profile.brand || '',
+      coachCode: onbTmp.role === 'coach' ? onbTmp.coachCodeGen : '',
+      coachAccessCode: onbTmp.role === 'agent' ? onbTmp.coachCode : '',
+    }).then((r) => { if (r && r.error) toast('Saved locally — backend sync failed: ' + r.error); });
   }
 
   /* ============================================================
@@ -155,17 +281,16 @@
   function renderTopbar() {
     const s = S.get();
     const title = s.mode === 'coach' ? COACH_TITLES[coachView] : AGENT_TITLES[current];
+    const sub = s.mode === 'coach'
+      ? esc(s.profile.name) + (s.profile.brand ? ' · ' + esc(s.profile.brand) : ' · Head Coach')
+      : Data.vertical().label + ' · ' + esc(s.profile.name);
     $('topbar').innerHTML = `<div class="topbar">
       <div>
         <h1>${title}</h1>
-        <div class="sub">${s.mode === 'coach' ? (s.profile.coachName + ' · Head Coach') : (Data.vertical().label + ' · ' + esc(s.profile.name))}</div>
+        <div class="sub">${sub}</div>
       </div>
       <div style="display:flex;align-items:center;gap:8px">
-        <button class="btn outline sm" data-act="open-menu" aria-label="Menu">☰</button>
-        <div class="mode-toggle">
-          <button class="${s.mode === 'agent' ? 'on' : ''}" data-act="mode:agent">Agent</button>
-          <button class="${s.mode === 'coach' ? 'on' : ''}" data-act="mode:coach">Coach</button>
-        </div>
+        <button class="icon-btn" data-act="open-menu" aria-label="Menu">${Icons.svg('menu', { size: 18 })}</button>
       </div>
     </div>`;
   }
@@ -174,14 +299,14 @@
     const s = S.get();
     const nav = $('bottomnav');
     if (s.mode === 'coach') {
-      const items = [['dashboard', '◧', 'Dashboard'], ['clients', '👥', 'Clients'], ['alerts', '🔔', 'Alerts']];
+      const items = [['dashboard', 'grid', 'Dashboard'], ['clients', 'users', 'Clients'], ['alerts', 'bell', 'Alerts']];
       const alertN = (s.demoAlerts || []).filter((a) => a.tone === 'red' || a.tone === 'amber').length;
       nav.innerHTML = items.map(([k, ic, l]) =>
-        `<button class="${coachView === k ? 'on' : ''}" data-act="cnav:${k}"><span class="ic">${ic}</span>${l}${k === 'alerts' && alertN ? ` <span class="badge">${alertN}</span>` : ''}</button>`).join('');
+        `<button class="${coachView === k ? 'on' : ''}" data-act="cnav:${k}"><span class="ic">${Icons.svg(ic)}</span>${l}${k === 'alerts' && alertN ? ` <span class="badge">${alertN}</span>` : ''}</button>`).join('');
     } else {
-      const items = [['today', '◈', 'Today'], ['track', '📊', 'Track'], ['pipeline', '🗂', 'Pipeline'], ['crm', '👤', 'CRM'], ['reports', '📄', 'Reports']];
+      const items = [['today', 'home', 'Today'], ['track', 'chart', 'Track'], ['pipeline', 'folder', 'Pipeline'], ['crm', 'user', 'CRM'], ['reports', 'file', 'Reports']];
       nav.innerHTML = items.map(([k, ic, l]) =>
-        `<button class="${current === k ? 'on' : ''}" data-act="nav:${k}"><span class="ic">${ic}</span>${l}</button>`).join('');
+        `<button class="${current === k ? 'on' : ''}" data-act="nav:${k}"><span class="ic">${Icons.svg(ic)}</span>${l}</button>`).join('');
     }
   }
 
@@ -190,7 +315,8 @@
      ============================================================ */
   function render() {
     const s = S.get();
-    if (!s.onboarded) { $('onboarding').style.display = 'block'; $('main').style.display = 'none'; renderOnboarding(); return; }
+    if (!Auth.getSession() || !s.onboarded) { $('onboarding').style.display = 'block'; $('main').style.display = 'none'; renderOnboarding(); return; }
+    $('onboarding').style.display = 'none'; $('main').style.display = 'block';
     renderTopbar(); renderNav();
     const host = $('views');
     if (s.mode === 'coach') host.innerHTML = coachScreen();
@@ -244,13 +370,13 @@
         <h3>Today's focus <span class="pill">${doneFocus}/${day.focus.length}</span></h3>
         ${day.focus.map((f) => `
           <div class="focus-item ${f.done ? 'done' : ''}" data-act="focus:${f.id}">
-            <div class="check ${f.done ? 'done' : ''}">${f.done ? '✓' : ''}</div>
+            <div class="check ${f.done ? 'done' : ''}">${f.done ? Icons.svg('check', { size: 12 }) : ''}</div>
             <div class="txt">${esc(f.text)}</div>
             <div class="time">${esc(f.time || '')}</div>
           </div>`).join('')}
         <div class="btn-row" style="margin-top:12px">
-          <button class="btn ghost sm" data-act="add-focus">＋ Add task</button>
-          <button class="btn ${day.reviewedEOD ? 'outline' : 'gold'} sm" data-act="eod-review">${day.reviewedEOD ? '✓ Day reviewed' : 'End-of-day review'}</button>
+          <button class="btn ghost sm" data-act="add-focus">${Icons.svg('plus', { size: 14 })} Add task</button>
+          <button class="btn ${day.reviewedEOD ? 'outline' : 'gold'} sm" data-act="eod-review">${day.reviewedEOD ? Icons.svg('check', { size: 14 }) + ' Day reviewed' : 'End-of-day review'}</button>
         </div>
       </div>
 
@@ -270,7 +396,7 @@
           <div>
             <div class="who">${esc(s.profile.coachName)} · your coach</div>
             <div class="when">auto-nudge · ${nowTime()}</div>
-            <div class="quote" style="color:#e7ecf5">"${coachNudge(pace, calls)}"</div>
+            <div class="quote">"${coachNudge(pace, calls)}"</div>
           </div>
         </div>
       </div>
@@ -279,8 +405,8 @@
         <h3>Daily summary & voice note</h3>
         <p class="subtle" style="margin:0 0 10px">What did you do, what did you learn, where did you struggle? Captured for you and ${esc(s.profile.coachName)}.</p>
         <div class="btn-row">
-          <button class="btn gold" data-act="open-voice">🎙 Record voice note</button>
-          <button class="btn outline" data-act="open-summary">✎ Write summary</button>
+          <button class="btn gold" data-act="open-voice">${Icons.svg('mic', { size: 15 })} Record voice note</button>
+          <button class="btn outline" data-act="open-summary">${Icons.svg('edit', { size: 15 })} Write summary</button>
         </div>
         ${day.voiceNotes.length ? `<div class="subtle" style="margin-top:10px">${day.voiceNotes.length} voice note(s) saved today.</div>` : ''}
         ${(day.summary.did || day.summary.learned || day.summary.struggled) ? `<div class="callout" style="margin-top:10px">${esc(day.summary.did || day.summary.learned || day.summary.struggled)}</div>` : ''}
@@ -293,11 +419,11 @@
 
       <div class="card">
         <h3>Predictive plan — tomorrow</h3>
-        ${pred.plans.map((p, i) => `<div class="callout ${i === 0 ? '' : ''}" style="margin-top:${i ? 8 : 0}px">→ ${esc(p.text)}</div>`).join('')}
+        ${pred.plans.map((p, i) => `<div class="callout" style="margin-top:${i ? 8 : 0}px">${Icons.svg('target', { size: 15 })}<span>${esc(p.text)}</span></div>`).join('')}
       </div>
 
       <div class="card" data-act="nav:goals" style="cursor:pointer">
-        <h3>Your goals <span class="pill">view all →</span></h3>
+        <h3>Your goals <span class="pill">view all</span></h3>
         <p class="subtle" style="margin:0">${s.buildFramework.goal ? esc(s.buildFramework.goal) : 'Set what every call is ultimately for.'}</p>
       </div>
     </section>`;
@@ -311,9 +437,9 @@
       <div class="label"><div class="l">${esc(m.label)}</div>
         <div class="track"><div class="fill ${over ? 'over' : ''}" style="width:${pct}%"></div></div></div>
       <div class="stepper">
-        <button class="minus" data-act="num:${m.key}:-">−</button>
+        <button class="minus" data-act="num:${m.key}:-">${Icons.svg('minus', { size: 13 })}</button>
         <div class="val">${val}<span class="t">/${tgt}</span></div>
-        <button data-act="num:${m.key}:+">＋</button>
+        <button data-act="num:${m.key}:+">${Icons.svg('plus', { size: 13 })}</button>
       </div></div>`;
   }
 
@@ -341,7 +467,7 @@
       <div class="tabs">${tabs.map(([k, l]) => `<button class="${trackPeriod === k ? 'on' : ''}" data-act="track-period:${k}">${l}</button>`).join('')}</div>
       <div class="card" style="display:flex;align-items:center;gap:14px">
         ${ring(agg.pace, 'PACE', { light: true, color: agg.pace >= 85 ? 'var(--green)' : 'var(--gold)' })}
-        <div><div style="font-weight:800;font-size:16px">${agg.pace >= 100 ? 'Ahead of pace' : agg.pace >= 85 ? 'On pace' : 'Behind pace'}</div>
+        <div><div style="font-weight:600;font-size:16px">${agg.pace >= 100 ? 'Ahead of pace' : agg.pace >= 85 ? 'On pace' : 'Behind pace'}</div>
         <div class="subtle">Hitting ${agg.pace}% of activity targets over ${Intel.rangeLabel(trackPeriod)}.${agg.assumedDays ? ` Minimums assumed for ${agg.assumedDays} unlogged day(s).` : ''}</div></div>
       </div>
 
@@ -362,7 +488,7 @@
 
       <div class="card">
         <div class="section-title">Outcomes · this period</div>
-        ${outs.map((o) => `<div class="kv"><span class="k">${esc(o.label)}</span><span class="v" style="color:${o.bad ? 'var(--red)' : 'var(--green)'}">${agg.outcomes[o.key].actual}</span></div>`).join('')}
+        ${outs.map((o) => `<div class="kv"><span class="k">${esc(o.label)}</span><span class="v" style="color:${o.bad ? 'var(--clay)' : 'var(--green)'}">${agg.outcomes[o.key].actual}</span></div>`).join('')}
       </div>
     </section>`;
   }
@@ -371,6 +497,7 @@
      AGENT — PIPELINE / DATABASE / SPECIAL OPS
      ============================================================ */
   let pipeTab = 'pipeline';
+  let pipeSearch = '';
   function viewPipeline() {
     const s = S.get(); const v = Data.vertical();
     const tabs = [['pipeline', 'Pipeline'], ['database', 'Database'], ['special', 'Special Ops']];
@@ -386,26 +513,34 @@
         </div>
         <div class="card">${s.pipeline.map((p) => pipeRow(p)).join('') || emptyState('No ' + v.pipelineNoun + 's yet.')}</div>`;
     } else if (pipeTab === 'database') {
-      body = `<div class="card"><p class="subtle" style="margin:0 0 10px">Every prospect you're working, searchable. Tap to update stage or add a note.</p>
-        ${s.pipeline.concat([]).sort((a, b) => a.name.localeCompare(b.name)).map((p) => pipeRow(p, true)).join('') || emptyState('Database is empty.')}</div>`;
+      const q = pipeSearch.trim().toLowerCase();
+      const filtered = s.pipeline.filter((p) => !q || (p.name + ' ' + (p.detail || '')).toLowerCase().includes(q));
+      body = `<div class="card">
+        <p class="subtle" style="margin:0 0 10px">Every prospect you're working, searchable. Tap to update stage or add a note.</p>
+        <div class="field-icon" style="margin-bottom:2px">
+          ${Icons.svg('search', { size: 15 })}
+          <input class="input" id="pipe-search" placeholder="Search by name or detail" value="${esc(pipeSearch)}" oninput="App.pipeSearch(this.value)">
+        </div>
+        ${filtered.concat([]).sort((a, b) => a.name.localeCompare(b.name)).map((p) => pipeRow(p, true)).join('') || emptyState(q ? 'No matches for "' + pipeSearch + '".' : 'Database is empty.')}
+      </div>`;
     } else {
       body = `<div class="card"><p class="subtle" style="margin:0 0 6px">Time-boxed focus campaigns — e.g. expired listings, win-backs, a farm street.</p></div>
         ${s.specialOps.map((op) => specialOpCard(op)).join('') || emptyState('No special operations running.')}
-        <button class="btn gold" data-act="add-specialop" style="margin-top:12px">＋ New special operation</button>`;
+        <button class="btn gold" data-act="add-specialop" style="margin-top:12px">${Icons.svg('plus', { size: 14 })} New special operation</button>`;
     }
     return `<section class="screen active">
       <div class="tabs">${tabs.map(([k, l]) => `<button class="${pipeTab === k ? 'on' : ''}" data-act="pipe-tab:${k}">${l}</button>`).join('')}</div>
       ${body}
-      ${pipeTab !== 'special' ? `<button class="btn gold" data-act="add-pipeline" style="margin-top:12px">＋ Add ${esc(v.pipelineNoun)}</button>` : ''}
+      ${pipeTab !== 'special' ? `<button class="btn gold" data-act="add-pipeline" style="margin-top:12px">${Icons.svg('plus', { size: 14 })} Add ${esc(v.pipelineNoun)}</button>` : ''}
     </section>`;
   }
 
   function pipeRow(p, db) {
-    const tone = p.stalled ? 'red' : (/(sold|won|listed|listing)/i.test(p.stage) ? 'green' : 'gold');
+    const tone = p.stalled ? 'red' : (/(sold|won|listed|listing)/i.test(p.stage) ? 'green' : '');
     return `<div class="lrow" data-act="edit-pipeline:${p.id}">
       <div class="mono">${initials(p.name)}</div>
       <div class="main"><div class="t">${esc(p.name)}</div><div class="s">${esc(p.detail || '')}</div></div>
-      <div class="right"><span class="tag ${tone}">${esc(p.stage)}</span>${p.stalled ? '<div class="subtle" style="font-size:10px;color:var(--red);margin-top:3px">Stalled</div>' : `<div class="subtle" style="font-size:10px;margin-top:3px">${money(p.value)}</div>`}</div>
+      <div class="right"><span class="tag ${tone}">${esc(p.stage)}</span>${p.stalled ? '<div class="subtle" style="font-size:10px;color:var(--clay);margin-top:3px">Stalled</div>' : `<div class="subtle" style="font-size:10px;margin-top:3px">${money(p.value)}</div>`}</div>
     </div>`;
   }
 
@@ -414,8 +549,8 @@
     return `<div class="card"><h3>${esc(op.title)} <span class="pill">${done}/${op.items.length}</span></h3>
       <p class="subtle" style="margin:0 0 10px">${esc(op.description)}</p>
       ${op.items.map((i) => `<div class="focus-item ${i.done ? 'done' : ''}" data-act="specialop-item:${op.id}:${i.id}">
-        <div class="check ${i.done ? 'done' : ''}">${i.done ? '✓' : ''}</div><div class="txt">${esc(i.name)}</div></div>`).join('')}
-      <div class="btn-row" style="margin-top:10px"><button class="btn ghost sm" data-act="specialop-add:${op.id}">＋ Add target</button></div>
+        <div class="check ${i.done ? 'done' : ''}">${i.done ? Icons.svg('check', { size: 12 }) : ''}</div><div class="txt">${esc(i.name)}</div></div>`).join('')}
+      <div class="btn-row" style="margin-top:10px"><button class="btn ghost sm" data-act="specialop-add:${op.id}">${Icons.svg('plus', { size: 14 })} Add target</button></div>
     </div>`;
   }
 
@@ -428,17 +563,17 @@
     const sorted = [...s.crm].sort((a, b) => (a.nextDate || '9999').localeCompare(b.nextDate || '9999'));
     return `<section class="screen active">
       <div class="card" style="display:flex;justify-content:space-between;align-items:center">
-        <div><div style="font-weight:800">${s.crm.length} contacts</div><div class="subtle">${overdue.length} next-action(s) overdue</div></div>
-        <button class="btn gold sm" data-act="add-crm">＋ Contact</button>
+        <div><div style="font-weight:600">${s.crm.length} contacts</div><div class="subtle">${overdue.length} next-action(s) overdue</div></div>
+        <button class="btn gold sm" data-act="add-crm">${Icons.svg('plus', { size: 14 })} Contact</button>
       </div>
       <div class="card"><div class="section-title">Next actions</div>
         ${sorted.map((c) => {
           const od = c.nextDate && c.nextDate < S.todayKey();
           return `<div class="lrow" data-act="edit-crm:${c.id}">
             <div class="mono">${initials(c.name)}</div>
-            <div class="main"><div class="t">${esc(c.name)} <span class="tag ${c.type === 'Hot' ? 'red' : c.type === 'Warm' ? 'amber' : ''}" style="margin-left:4px">${esc(c.type || '')}</span></div>
+            <div class="main"><div class="t">${esc(c.name)} <span class="tag ${c.type === 'Hot' ? 'gold' : c.type === 'Cold' ? 'red' : ''}" style="margin-left:4px">${esc(c.type || '')}</span></div>
             <div class="s">${esc(c.nextAction || 'No next action')}</div></div>
-            <div class="right"><div class="subtle" style="font-size:11px;color:${od ? 'var(--red)' : 'var(--muted)'}">${c.nextDate ? S.fmtShort(c.nextDate) : ''}</div>
+            <div class="right"><div class="subtle" style="font-size:11px;color:${od ? 'var(--clay)' : 'var(--muted)'}">${c.nextDate ? S.fmtShort(c.nextDate) : ''}</div>
             <button class="tag green" data-act="crm-done:${c.id}" style="margin-top:4px">Done</button></div>
           </div>`;
         }).join('') || emptyState('No contacts yet.')}
@@ -446,8 +581,8 @@
       <div class="card"><div class="section-title">Backup & restore</div>
         <p class="subtle" style="margin:0 0 10px">Your CRM and all data lives on this device. Export a backup file regularly, or restore from one.</p>
         <div class="btn-row">
-          <button class="btn outline" data-act="backup-export">⭳ Export backup</button>
-          <button class="btn outline" data-act="backup-import">⭱ Restore</button>
+          <button class="btn outline" data-act="backup-export">${Icons.svg('download', { size: 15 })} Export backup</button>
+          <button class="btn outline" data-act="backup-import">${Icons.svg('upload', { size: 15 })} Restore</button>
         </div>
       </div>
     </section>`;
@@ -464,26 +599,26 @@
     return `<section class="screen active">
       <div class="tabs">${types.map(([k, l]) => `<button class="${reportType === k ? 'on' : ''}" data-act="report-type:${k}">${l}</button>`).join('')}</div>
       <div class="card dark" style="display:flex;align-items:center;gap:14px">
-        ${ring(r.score, '', { color: r.score >= 85 ? 'var(--green)' : 'var(--gold)' })}
-        <div><div style="font-family:var(--serif);font-size:22px;font-weight:600">${r.title}</div>
-        <div class="subtle" style="color:#c9d2e2">${r.rangeLabel}</div>
-        <div class="subtle" style="color:#aeb9cd;margin-top:2px">Auto-shared with ${esc(r.coachName)}</div></div>
+        ${ring(r.score, '', { color: 'var(--gold)' })}
+        <div><div style="font-family:var(--headline);font-size:22px;font-weight:480">${r.title}</div>
+        <div class="subtle" style="color:var(--bone-muted)">${r.rangeLabel}</div>
+        <div class="subtle" style="margin-top:2px">Auto-shared with ${esc(r.coachName)}</div></div>
       </div>
 
       <div class="card"><div class="section-title">Activity vs target</div>${weekBarsFor(r.agg)}</div>
 
       <div class="card"><div class="section-title">What's working</div>
-        <ul class="list-plain">${r.working.map((w) => `<li><span class="mk">✓</span><span>${esc(w)}</span></li>`).join('') || '<li class="subtle">Keep logging to surface wins.</li>'}</ul>
+        <ul class="list-plain">${r.working.map((w) => `<li><span class="mk">${Icons.svg('check', { size: 14 })}</span><span>${esc(w)}</span></li>`).join('') || '<li class="subtle">Keep logging to surface wins.</li>'}</ul>
       </div>
       <div class="card"><div class="section-title">Areas to improve</div>
-        <ul class="list-plain">${r.improve.map((w) => `<li><span class="mk warn">!</span><span>${esc(w)}</span></li>`).join('') || '<li class="subtle">Nothing flagged — strong period.</li>'}</ul>
+        <ul class="list-plain">${r.improve.map((w) => `<li><span class="mk warn">${Icons.svg('target', { size: 14 })}</span><span>${esc(w)}</span></li>`).join('') || '<li class="subtle">Nothing flagged — strong period.</li>'}</ul>
       </div>
 
       <div class="card"><h3>${esc(r.coachName)}'s playbook — get better</h3>
-        ${r.suggestions.map((t) => `<div class="callout ${t.tone === 'good' ? 'green' : ''}">${esc(t.text)}</div>`).join('')}
+        ${r.suggestions.map((t) => `<div class="callout ${t.tone === 'good' ? 'green' : ''}">${Icons.svg(t.tone === 'good' ? 'check' : 'target', { size: 15 })}<span>${esc(t.text)}</span></div>`).join('')}
       </div>
       <div class="card"><div class="section-title">Predictive — next moves</div>
-        ${r.predictive.plans.map((p) => `<div class="callout">→ ${esc(p.text)}</div>`).join('')}
+        ${r.predictive.plans.map((p) => `<div class="callout">${Icons.svg('target', { size: 15 })}<span>${esc(p.text)}</span></div>`).join('')}
       </div>
 
       <div class="btn-row" style="margin-top:14px">
@@ -514,10 +649,10 @@
         <div class="kv"><span class="k">Goal</span><span class="v" style="text-align:right;max-width:60%">${esc(bf.goal || '—')}</span></div>
         <div class="kv"><span class="k">Proof</span><span class="v" style="text-align:right;max-width:60%">${esc(bf.proof || '—')}</span></div>
         <div class="section-title" style="margin-top:12px">Steps</div>
-        <ul class="list-plain">${(bf.steps || []).map((st) => `<li><span class="mk">→</span><span>${esc(st)}</span></li>`).join('') || '<li class="subtle">No steps yet.</li>'}</ul>
+        <ul class="list-plain">${(bf.steps || []).map((st) => `<li><span class="mk">${Icons.svg('check', { size: 14 })}</span><span>${esc(st)}</span></li>`).join('') || '<li class="subtle">No steps yet.</li>'}</ul>
         <button class="btn outline sm" data-act="edit-build" style="margin-top:10px">Edit framework</button>
       </div>
-      <div class="card"><h3>Your goals <button class="btn gold sm" data-act="add-goal">＋ Add</button></h3>
+      <div class="card"><h3>Your goals <button class="btn gold sm" data-act="add-goal">${Icons.svg('plus', { size: 14 })} Add</button></h3>
         <div class="grid2">${s.goals.map((g) => `<div class="goalcard" data-act="edit-goal:${g.id}">
           <div class="cat">${esc(g.category)}</div><div class="ti">${esc(g.title)}</div><div class="de">${esc(g.detail || '')}</div></div>`).join('')}</div>
       </div>
@@ -535,10 +670,10 @@
     const checkins = r.filter((c) => /Today/.test(c.last)).length;
     return `<section class="screen active">
       <div class="grid2">
-        <div class="card" style="margin-top:0"><div class="section-title">Active clients</div><div style="font-size:26px;font-weight:800">${r.length}</div></div>
-        <div class="card" style="margin-top:0"><div class="section-title">On track</div><div style="font-size:26px;font-weight:800;color:var(--green)">${onTrack}</div></div>
-        <div class="card" style="margin-top:0"><div class="section-title">At risk</div><div style="font-size:26px;font-weight:800;color:var(--red)">${atRisk}</div></div>
-        <div class="card" style="margin-top:0"><div class="section-title">Check-ins today</div><div style="font-size:26px;font-weight:800">${checkins}/${r.length}</div></div>
+        <div class="card" style="margin-top:0"><div class="section-title">Active clients</div><div style="font-size:26px;font-family:var(--mono);font-weight:500">${r.length}</div></div>
+        <div class="card" style="margin-top:0"><div class="section-title">On track</div><div style="font-size:26px;font-family:var(--mono);font-weight:500;color:var(--green)">${onTrack}</div></div>
+        <div class="card" style="margin-top:0"><div class="section-title">At risk</div><div style="font-size:26px;font-family:var(--mono);font-weight:500;color:var(--clay)">${atRisk}</div></div>
+        <div class="card" style="margin-top:0"><div class="section-title">Check-ins today</div><div style="font-size:26px;font-family:var(--mono);font-weight:500">${checkins}/${r.length}</div></div>
       </div>
       <div class="card"><h3>Your clients <span class="pill">tap to drill in</span></h3>
         ${r.map((c) => {
@@ -559,7 +694,7 @@
       <div class="card"><p class="subtle" style="margin:0">Full client roster. Each agent's data, reports and voice notes roll up here. (Cloud sync arrives in the next phase — for now this shows the demo roster.)</p></div>
       ${s.coachRoster.map((c) => `<div class="card" style="display:flex;align-items:center;gap:12px" data-act="coach-client:${esc(c.name)}">
         <div class="avatar lg">${initials(c.name)}</div>
-        <div style="flex:1"><div style="font-weight:800">${esc(c.name)}</div><div class="subtle">${esc(c.type)} · ${c.pace}% pace · ${c.streak}-day streak</div></div>
+        <div style="flex:1"><div style="font-weight:600">${esc(c.name)}</div><div class="subtle">${esc(c.type)} · ${c.pace}% pace · ${c.streak}-day streak</div></div>
         <span class="tag ${c.status === 'On track' ? 'green' : c.status === 'At risk' ? 'red' : 'amber'}">${esc(c.status)}</span>
       </div>`).join('')}
     </section>`;
@@ -570,8 +705,8 @@
     return `<section class="screen active">
       <div class="card"><p class="subtle" style="margin:0">Flagged automatically from missed entries, pace and check-ins.</p></div>
       ${(s.demoAlerts || []).map((a) => `<div class="card" style="display:flex;align-items:center;gap:10px">
-        <span class="rec-dot" style="background:${a.tone === 'green' ? 'var(--green)' : a.tone === 'amber' ? 'var(--amber)' : 'var(--red)'};animation:none"></span>
-        <div style="flex:1"><div style="font-weight:800">${esc(a.name)} <span class="tag ${a.tone === 'green' ? 'green' : a.tone === 'amber' ? 'amber' : 'red'}" style="margin-left:4px">${esc(a.kind)}</span></div>
+        <span class="rec-dot" style="background:${a.tone === 'green' ? 'var(--green)' : a.tone === 'amber' ? 'var(--amber)' : 'var(--clay)'};animation:none"></span>
+        <div style="flex:1"><div style="font-weight:600">${esc(a.name)} <span class="tag ${a.tone === 'green' ? 'green' : a.tone === 'amber' ? 'amber' : 'red'}" style="margin-left:4px">${esc(a.kind)}</span></div>
         <div class="subtle">${esc(a.text)}</div></div>
         <button class="btn outline sm" data-act="coach-client:${esc(a.name)}">Review</button>
       </div>`).join('')}
@@ -584,7 +719,7 @@
   function greeting() { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; }
   function nowTime() { return new Date().toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' }); }
   function money(n) { n = n || 0; if (n >= 1e6) return '$' + (n / 1e6).toFixed(1) + 'm'; if (n >= 1e3) return '$' + Math.round(n / 1e3) + 'k'; return '$' + n; }
-  function emptyState(msg) { return `<div class="empty"><div class="big">◇</div>${esc(msg)}</div>`; }
+  function emptyState(msg) { return `<div class="empty">${Icons.svg('inbox', { size: 26 })}${esc(msg)}</div>`; }
   function coachNudge(pace, calls) {
     const left = Math.max(0, calls.target - calls.done);
     if (pace >= 100) return `You're over target already — bank it, then get one more appraisal booked before you switch off.`;
@@ -597,7 +732,11 @@
     get current() { return current; }, set current(v) { current = v; },
     get coachView() { return coachView; }, set coachView(v) { coachView = v; },
     get onbStep() { return onbStep; }, set onbStep(v) { onbStep = v; },
+    get authMode() { return authMode; }, set authMode(v) { authMode = v; },
+    get authError() { return authError; }, set authError(v) { authError = v; },
+    get authInfo() { return authInfo; }, set authInfo(v) { authInfo = v; },
     get pipeTab() { return pipeTab; }, set pipeTab(v) { pipeTab = v; },
+    get pipeSearch() { return pipeSearch; }, set pipeSearch(v) { pipeSearch = v; },
     get trackPeriod() { return trackPeriod; }, set trackPeriod(v) { trackPeriod = v; },
     get reportType() { return reportType; }, set reportType(v) { reportType = v; },
     get onbTmp() { return onbTmp; },
