@@ -640,8 +640,6 @@
     $('sv-go').addEventListener('click', () => {
       s.profile.vertical = next; s.profile.role = Data.VERTICALS[next].roleLabel;
       Data.seedTargets();
-      if (!s.pipeline.length) s.pipeline = Data.samplePipeline(next);
-      if (!s.specialOps.length) s.specialOps = Data.sampleSpecialOps(next);
       s.focusTemplate = Data.DEFAULT_FOCUS[next].map((x) => ({ ...x }));
       S.save(); UI.closeSheet(); UI.current = 'today'; UI.render(); UI.toast('Switched to ' + Data.VERTICALS[next].label);
     });

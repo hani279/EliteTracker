@@ -243,7 +243,6 @@
       s.profile.role = 'Head Coach';
       s.profile.brand = onbTmp.brand || '';
       s.profile.coachCode = onbTmp.coachCodeGen || '';
-      Data.seedCoach();
     } else {
       s.mode = 'agent';
       s.profile.name = onbTmp.name || 'Agent';
@@ -252,7 +251,6 @@
       s.buildFramework = { goal: onbTmp.goal, proof: onbTmp.proof, steps: onbTmp.steps.filter(Boolean) };
       if (onbTmp.did) { const t = S.dayRecord(S.todayKey()); t.summary.did = onbTmp.did; }
       Data.seedAll(onbTmp.vertical);
-      Data.seedHistory();
     }
     s.onboarded = true;
     S.save();
