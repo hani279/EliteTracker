@@ -651,7 +651,12 @@
       <p class="subtle">This clears everything on this device and restarts onboarding. Export a backup first if unsure.</p>
       <div class="btn-row" style="margin-top:14px"><button class="btn outline" data-act="close-sheet">Cancel</button>
       <button class="btn danger" id="rs-go">Reset everything</button></div>`);
-    $('rs-go').addEventListener('click', () => { S.reset(); UI.onbStep = 0; UI.closeSheet(); location.reload(); });
+    // Clearing lastUid alongside the local state forces syncForSession() to
+    // treat the next boot like a fresh login and re-pull from Supabase,
+    // instead of seeing the same uid still cached and skipping the pull —
+    // otherwise a signed-in user would land back in onboarding with their
+    // real cloud data never coming back down.
+    $('rs-go').addEventListener('click', () => { S.reset(); S.setLastUid(null); UI.onbStep = 0; UI.closeSheet(); location.reload(); });
   }
   function doInstall() {
     if (installPrompt) { installPrompt.prompt(); installPrompt = null; UI.closeSheet(); }
