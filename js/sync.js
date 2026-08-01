@@ -78,7 +78,7 @@
     }
     if ((s.crm || []).length) {
       await c.from('crm_contacts').upsert(s.crm.map((x) => ({
-        id: x.id, profile_id: pid, name: x.name, contact: x.contact || '', type: x.type || 'Warm',
+        id: x.id, profile_id: pid, name: x.name, phone: x.phone || '', email: x.email || '', stage: x.stage || 'New',
         next_action: x.nextAction || '', next_date: x.nextDate || null, notes: x.notes || '',
       })));
     }
@@ -128,6 +128,15 @@
       s.profile.brand = profileRow.brand || '';
       s.profile.coachCode = profileRow.coach_code || s.profile.coachCode || '';
       s.profile.role = profileRow.role === 'coach' ? 'Head Coach' : s.profile.role;
+      // coach_id is the only thing linking an agent to their coach — the
+      // coach's display name lives on the coach's own row, not this one.
+      if (profileRow.coach_id) {
+        s.profile.coachId = profileRow.coach_id;
+        const { data: coachRow } = await c.from('profiles').select('name').eq('id', profileRow.coach_id).maybeSingle();
+        if (coachRow && coachRow.name) s.profile.coachName = coachRow.name;
+      } else {
+        s.profile.coachId = '';
+      }
       if (profileRow.targets && Object.keys(profileRow.targets).length) s.targets = profileRow.targets;
       if (profileRow.focus_template && profileRow.focus_template.length) s.focusTemplate = profileRow.focus_template;
       if (profileRow.build_framework) s.buildFramework = profileRow.build_framework;
@@ -166,7 +175,7 @@
 
     const { data: crm } = await c.from('crm_contacts').select('*').eq('profile_id', pid);
     if (crm && crm.length) s.crm = crm.map((x) => ({
-      id: x.id, name: x.name, contact: x.contact, type: x.type, nextAction: x.next_action,
+      id: x.id, name: x.name, phone: x.phone, email: x.email, stage: x.stage, nextAction: x.next_action,
       nextDate: x.next_date, notes: x.notes, updated: Date.parse(x.updated_at) || Date.now(),
     }));
 
@@ -213,13 +222,11 @@
     const vKey = agent.vertical === 'sales' ? 'sales' : 'realestate';
     const defs = (Data && Data.VERTICALS[vKey].activity) || [];
     const targets = agent.targets || {};
-    const settings = agent.settings || {};
-    const assumeMin = settings.assumeMinimums !== false;
     const today = S.todayKey();
     const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
     const isWeekend = (k) => [0, 6].includes(S.parseKey(k).getDay());
 
-    // 7-day pace, same adaptive-minimum logic as intelligence.js's aggregate()
+    // 7-day pace, same logic as intelligence.js's aggregate()
     let totalActual = 0, totalTarget = 0;
     for (let i = 6; i >= 0; i--) {
       const k = S.addDays(today, -i);
@@ -231,7 +238,6 @@
         const tgt = targets[m.key] ?? m.target;
         if (!weekend && isPast) totalTarget += tgt;
         if (logged) totalActual += (rec.numbers[m.key] || 0);
-        else if (!weekend && isPast && assumeMin) totalActual += Math.round(tgt * 0.5);
       });
     }
     const pace = totalTarget > 0 ? Math.round((totalActual / totalTarget) * 100) : 0;

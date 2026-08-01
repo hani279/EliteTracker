@@ -154,6 +154,39 @@
     notify();
   }
 
+  /* ---------- coach-code lookup / linking ----------
+     Coach codes are generated uppercase (see generateCoachCode in ui.js),
+     but nothing enforced that on entry — a code typed in lowercase, or
+     pasted with stray whitespace, would never match the stored value
+     since find_coach_by_code does a plain exact-match. Normalizing here
+     (rather than an ilike change in the RPC) fixes it without a schema
+     migration. Split into a read-only lookup (safe to call before this
+     user's own profiles row exists, e.g. live during onboarding) and a
+     linking step that requires it. */
+  function normalizeCoachCode(code) { return String(code || '').trim().toUpperCase(); }
+
+  async function findCoachByCode(code) {
+    const c = client();
+    const norm = normalizeCoachCode(code);
+    if (!norm) return { error: 'Enter a code.' };
+    if (!c) return { error: 'Coach linking needs the backend connected first.' };
+    const { data, error } = await c.rpc('find_coach_by_code', { code: norm });
+    if (error) return { error: error.message };
+    if (!data || !data[0]) return { error: 'No coach found with that code — check with your coach.' };
+    return { coach: data[0] };
+  }
+
+  async function linkCoach(code) {
+    if (!cachedSession) return { error: 'Not signed in.' };
+    const c = client();
+    if (!c) return { error: 'Coach linking needs the backend connected first.' };
+    const found = await findCoachByCode(code);
+    if (found.error) return found;
+    const { error } = await c.from('profiles').update({ coach_id: found.coach.id }).eq('id', cachedSession.id);
+    if (error) return { error: error.message };
+    return { ok: true, coach: found.coach };
+  }
+
   /* ---------- profile creation (fires after onboarding finishes) ----------
      Local app state (js/store.js) remains the source of truth for now —
      this call is fire-and-forget best-effort sync to the backend so a
@@ -174,18 +207,16 @@
     };
     const { error } = await c.from('profiles').upsert(row);
     if (error) return { error: error.message };
+    let coachLinkResult = null;
     if (profile.role === 'agent' && profile.coachAccessCode) {
-      const { data: coaches } = await c.rpc('find_coach_by_code', { code: profile.coachAccessCode.trim() });
-      if (coaches && coaches[0]) {
-        await c.from('profiles').update({ coach_id: coaches[0].id }).eq('id', cachedSession.id);
-      }
+      coachLinkResult = await linkCoach(profile.coachAccessCode);
     }
-    return { ok: true };
+    return { ok: true, coachLinkResult };
   }
 
   global.Auth = {
     init, getSession, onChange,
     signUpEmail, signInEmail, signInGoogle, signOut,
-    isGoogleConfigured, syncProfile,
+    isGoogleConfigured, syncProfile, findCoachByCode, linkCoach,
   };
 })(window);

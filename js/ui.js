@@ -12,7 +12,7 @@
   let authMode = 'signup';     // 'signup' | 'login'
   let authError = '';
   let authInfo = '';           // neutral/positive notice, e.g. "check your email"
-  const onbTmp = { role: null, vertical: null, name: '', coachName: 'Harry', coachCode: '', brand: '', coachCodeGen: '', goal: '', proof: '', steps: ['', '', ''] };
+  const onbTmp = { role: null, vertical: null, name: '', coachName: '', coachId: '', coachLookupStatus: '', coachCode: '', brand: '', coachCodeGen: '', goal: '', proof: '', steps: ['', '', ''] };
 
   // onbTmp otherwise lives only in memory — close the tab mid-onboarding
   // (phone locks, an accidental swipe-away, a background tab getting
@@ -158,15 +158,23 @@
   }
 
   function stepProfile() {
+    const status = onbTmp.coachLookupStatus;
+    const statusHtml = status === 'checking'
+      ? `<div class="subtle" style="margin-top:6px">Looking up code…</div>`
+      : status === 'found'
+      ? `<div class="subtle" style="margin-top:6px;color:var(--green)">${Icons.svg('check', { size: 13 })} Coach found: ${esc(onbTmp.coachName)}</div>`
+      : status === 'notfound'
+      ? `<div class="subtle" style="margin-top:6px;color:var(--clay)">No coach found with that code — you can add it later in Settings.</div>`
+      : '';
     return `<h2>Who's tracking?</h2>
       <p class="lead">So your coach sees who's putting in the work.</p>
       <div class="card-light">
         <div class="field"><label>Your name</label>
           <input class="input" id="onb-name" placeholder="e.g. Jordan Avery" value="${esc(onbTmp.name)}" oninput="UI.captureOnb()"></div>
-        <div class="field"><label>Your coach's name</label>
-          <input class="input" id="onb-coach" placeholder="e.g. Harry" value="${esc(onbTmp.coachName)}" oninput="UI.captureOnb()"></div>
         <div class="field" style="margin-bottom:0"><label>Coach access code (optional)</label>
-          <input class="input" id="onb-code" placeholder="e.g. HARRY-4821" value="${esc(onbTmp.coachCode)}" oninput="UI.captureOnb()"></div>
+          <input class="input" id="onb-code" placeholder="e.g. HARRY-4821" value="${esc(onbTmp.coachCode)}" oninput="App.coachCodeInput(this.value)">
+          ${statusHtml}
+        </div>
       </div>
       <div class="step-actions">
         <button class="btn ghost" data-act="onb-back">Back</button>
@@ -249,7 +257,6 @@
     }
     if (onbStep === 1) {
       onbTmp.name = ($('onb-name') || {}).value || '';
-      onbTmp.coachName = ($('onb-coach') || {}).value || 'Harry';
       onbTmp.coachCode = ($('onb-code') || {}).value || '';
     }
     if (onbStep === 2) { onbTmp.did = ($('onb-did') || {}).value || ''; }
@@ -273,7 +280,7 @@
     } else {
       s.mode = 'agent';
       s.profile.name = onbTmp.name || 'Agent';
-      s.profile.coachName = onbTmp.coachName || 'Harry';
+      s.profile.coachName = onbTmp.coachName || 'your coach';
       s.profile.coachCode = onbTmp.coachCode || '';
       s.buildFramework = { goal: onbTmp.goal, proof: onbTmp.proof, steps: onbTmp.steps.filter(Boolean) };
       if (onbTmp.did) { const t = S.dayRecord(S.todayKey()); t.summary.did = onbTmp.did; }
@@ -295,7 +302,19 @@
       brand: s.profile.brand || '',
       coachCode: onbTmp.role === 'coach' ? onbTmp.coachCodeGen : '',
       coachAccessCode: onbTmp.role === 'agent' ? onbTmp.coachCode : '',
-    }).then((r) => { if (r && r.error) toast('Saved locally — backend sync failed: ' + r.error); });
+    }).then((r) => {
+      if (r && r.error) { toast('Saved locally — backend sync failed: ' + r.error); return; }
+      if (r && r.coachLinkResult) {
+        if (r.coachLinkResult.ok) {
+          const st = S.get();
+          st.profile.coachId = r.coachLinkResult.coach.id;
+          st.profile.coachName = r.coachLinkResult.coach.name;
+          S.save(); render();
+        } else if (r.coachLinkResult.error && onbTmp.coachCode) {
+          toast("Coach code not found — you can add it later in Settings.");
+        }
+      }
+    });
   }
 
   /* ============================================================
@@ -496,7 +515,7 @@
       <div class="card" style="display:flex;align-items:center;gap:14px">
         ${ring(agg.pace, 'PACE', { light: true, color: agg.pace >= 85 ? 'var(--green)' : 'var(--gold)' })}
         <div><div style="font-weight:600;font-size:16px">${agg.pace >= 100 ? 'Ahead of pace' : agg.pace >= 85 ? 'On pace' : 'Behind pace'}</div>
-        <div class="subtle">Hitting ${agg.pace}% of activity targets over ${Intel.rangeLabel(trackPeriod)}.${agg.assumedDays ? ` Minimums assumed for ${agg.assumedDays} unlogged day(s).` : ''}</div></div>
+        <div class="subtle">Hitting ${agg.pace}% of activity targets over ${Intel.rangeLabel(trackPeriod)}.</div></div>
       </div>
 
       <div class="card">
@@ -597,9 +616,10 @@
       <div class="card"><div class="section-title">Next actions</div>
         ${sorted.map((c) => {
           const od = c.nextDate && c.nextDate < S.todayKey();
+          const stageTone = c.stage === 'Won' ? 'green' : c.stage === 'Lost' ? 'red' : c.stage === 'Negotiating' ? 'gold' : '';
           return `<div class="lrow" data-act="edit-crm:${c.id}">
             <div class="mono">${initials(c.name)}</div>
-            <div class="main"><div class="t">${esc(c.name)} <span class="tag ${c.type === 'Hot' ? 'gold' : c.type === 'Cold' ? 'red' : ''}" style="margin-left:4px">${esc(c.type || '')}</span></div>
+            <div class="main"><div class="t">${esc(c.name)} <span class="tag ${stageTone}" style="margin-left:4px">${esc(c.stage || '')}</span></div>
             <div class="s">${esc(c.nextAction || 'No next action')}</div></div>
             <div class="right"><div class="subtle" style="font-size:11px;color:${od ? 'var(--clay)' : 'var(--muted)'}">${c.nextDate ? S.fmtShort(c.nextDate) : ''}</div>
             <button class="tag green" data-act="crm-done:${c.id}" style="margin-top:4px">Done</button></div>

@@ -120,7 +120,7 @@
 }
 
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;padding:0}
+html,body{margin:0;padding:0;overscroll-behavior:none}
 body{
   font-family:var(--sans);
   font-size:14.5px;
@@ -128,7 +128,6 @@ body{
   background:var(--page-wash), var(--page-bg);
   background-attachment:fixed;
   -webkit-font-smoothing:antialiased;
-  overscroll-behavior-y:none;
 }
 button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
 input,select,textarea{font-family:inherit;font-size:16px}

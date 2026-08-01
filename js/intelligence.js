@@ -37,7 +37,7 @@
     return Math.max(1, count);
   }
 
-  // ---- core aggregation with adaptive missing-data handling ----
+  // ---- core aggregation ----
   function aggregate(keys) {
     const s = S.get();
     const defs = Data.activityDefs();
@@ -45,12 +45,12 @@
     const metrics = {};
     defs.forEach((m) => metrics[m.key] = {
       key: m.key, label: m.label, short: m.short, minutesEach: m.minutesEach,
-      actual: 0, target: 0, assumed: 0,
+      actual: 0, target: 0,
     });
     const outcomes = {};
     outs.forEach((o) => outcomes[o.key] = { key: o.key, label: o.label, actual: 0, bad: !!o.bad });
 
-    let loggedDays = 0, missedDays = 0, assumedDays = 0, workdays = 0;
+    let loggedDays = 0, missedDays = 0, workdays = 0;
     const today = startOfToday();
 
     keys.forEach((k) => {
@@ -62,20 +62,11 @@
       if (logged) loggedDays++;
       else if (!weekend && isPast) missedDays++;
 
-      let dayAssumed = false;
       defs.forEach((m) => {
         const tgt = s.targets[m.key] ?? m.target;
         if (!weekend && isPast) metrics[m.key].target += tgt;
-        if (logged) {
-          metrics[m.key].actual += (rec.numbers[m.key] || 0);
-        } else if (!weekend && isPast && s.settings.assumeMinimums) {
-          const floor = Math.round(tgt * 0.5); // assumed minimum
-          metrics[m.key].actual += floor;
-          metrics[m.key].assumed += floor;
-          dayAssumed = true;
-        }
+        if (logged) metrics[m.key].actual += (rec.numbers[m.key] || 0);
       });
-      if (dayAssumed) assumedDays++;
       if (rec && rec.outcomes) outs.forEach((o) => { outcomes[o.key].actual += (rec.outcomes[o.key] || 0); });
     });
 
@@ -83,7 +74,7 @@
     defs.forEach((m) => { totalActual += metrics[m.key].actual; totalTarget += metrics[m.key].target; });
     const pace = totalTarget > 0 ? Math.round((totalActual / totalTarget) * 100) : 0;
 
-    return { metrics, outcomes, defs, outs, totalActual, totalTarget, pace, loggedDays, missedDays, assumedDays, workdays, keys };
+    return { metrics, outcomes, defs, outs, totalActual, totalTarget, pace, loggedDays, missedDays, workdays, keys };
   }
 
   function metricPace(m) { return m.target > 0 ? Math.round((m.actual / m.target) * 100) : 100; }
@@ -156,7 +147,7 @@
 
     // 3) missed logging
     if (agg.missedDays > 0) {
-      tips.push({ tone: 'warn', text: `You missed logging ${agg.missedDays} day${agg.missedDays > 1 ? 's' : ''}${agg.assumedDays ? ' (minimums were assumed)' : ''}. Log daily — your coach reports and predictions are only as good as your inputs.` });
+      tips.push({ tone: 'warn', text: `You missed logging ${agg.missedDays} day${agg.missedDays > 1 ? 's' : ''}. Log daily — your coach reports and predictions are only as good as your inputs.` });
     }
 
     // 4) consistency praise
@@ -229,7 +220,7 @@
     Object.values(agg.outcomes).forEach((o) => { if (!o.bad && o.actual > 0) working.push(`${o.actual} × ${o.label}`); });
     // improve: metrics < 85%
     agg.defs.forEach((d) => { const m = agg.metrics[d.key]; if (metricPace(m) < 85 && m.target > 0) improve.push(`${m.label} running ${metricPace(m)}% of target`); });
-    if (agg.missedDays) improve.push(`${agg.missedDays} day(s) not logged${agg.assumedDays ? ' — minimums assumed' : ''}`);
+    if (agg.missedDays) improve.push(`${agg.missedDays} day(s) not logged`);
 
     return {
       type, ref: ref || S.todayKey(),
@@ -254,7 +245,7 @@
     L.push(`Overall pace: ${r.score}%`);
     L.push('');
     L.push('ACTIVITY vs TARGET');
-    r.agg.defs.forEach((d) => { const m = r.agg.metrics[d.key]; L.push(`  ${m.label}: ${m.actual}/${m.target} (${metricPace(m)}%)${m.assumed ? ' *incl assumed min' : ''}`); });
+    r.agg.defs.forEach((d) => { const m = r.agg.metrics[d.key]; L.push(`  ${m.label}: ${m.actual}/${m.target} (${metricPace(m)}%)`); });
     L.push('');
     if (r.working.length) { L.push("WHAT'S WORKING"); r.working.forEach((w) => L.push('  + ' + w)); L.push(''); }
     if (r.improve.length) { L.push('AREAS TO IMPROVE'); r.improve.forEach((w) => L.push('  ! ' + w)); L.push(''); }

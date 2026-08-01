@@ -26,7 +26,7 @@
       version: 1,
       onboarded: false,
       mode: 'agent',            // 'agent' | 'coach'
-      profile: { name: '', coachName: 'Harry', coachCode: '', brand: '', vertical: 'realestate', role: '' },
+      profile: { name: '', coachName: '', coachCode: '', coachId: '', brand: '', vertical: 'realestate', role: '' },
       buildFramework: { goal: '', proof: '', steps: [] }, // Goal / Proof / Steps — build best agent
       goals: [],                // life & business goals grid
       targets: {},              // metricKey -> daily target (per vertical, seeded)
@@ -39,9 +39,8 @@
         remindersEnabled: false,
         reminderTime: '08:00',
         eodTime: '17:00',
-        assumeMinimums: true,   // adapt to missing data
         numbersDue: '17:00',
-        theme: 'dark',          // 'dark' | 'light'
+        theme: 'light',         // 'dark' | 'light'
       },
       reportsLog: [],           // {id,type,rangeLabel,date,score}
       coachRoster: [],          // demo roster for coach view

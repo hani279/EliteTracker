@@ -28,7 +28,7 @@
 
   /* ---------- init ---------- */
   S.load();
-  applyTheme(S.get().settings.theme || 'dark');
+  applyTheme(S.get().settings.theme || 'light');
   document.addEventListener('DOMContentLoaded', boot);
   if (document.readyState !== 'loading') boot();
   let booted = false;
@@ -440,33 +440,75 @@
   }
 
   /* ---------- CRM ---------- */
+  const CRM_STAGES = ['New', 'Contacted', 'Qualified', 'Negotiating', 'Won', 'Lost'];
+  const CRM_NEXT_ACTIONS = ['Call', 'Text', 'Email', 'Follow up', 'Send proposal', 'Book meeting', 'Send info', 'Check in'];
+
+  function nextActionField(current) {
+    const isCustom = current && !CRM_NEXT_ACTIONS.includes(current);
+    return `<div class="field"><label>Next action</label>
+      <select class="input" id="c-action-select">
+        ${CRM_NEXT_ACTIONS.map((a) => `<option value="${a}" ${a === current ? 'selected' : ''}>${a}</option>`).join('')}
+        <option value="__custom__" ${isCustom ? 'selected' : ''}>Custom…</option>
+      </select>
+      <input class="input" id="c-action-custom" placeholder="Describe the action" value="${UI.esc(isCustom ? current : '')}" style="margin-top:8px${isCustom ? '' : ';display:none'}"></div>`;
+  }
+
   function crmSheet(id) {
     const s = S.get();
-    const c = id ? s.crm.find((x) => x.id === id) : { name: '', contact: '', type: 'Warm', nextAction: '', nextDate: S.todayKey(), notes: '' };
+    const c = id ? s.crm.find((x) => x.id === id) : { name: '', phone: '', email: '', stage: 'New', nextAction: '', nextDate: S.todayKey(), notes: '' };
+    const canImport = !!(navigator.contacts && navigator.contacts.select);
     UI.openSheet(`<h3>${id ? 'Edit' : 'New'} contact</h3>
+      ${canImport ? `<button class="btn outline" id="c-import" style="margin-bottom:14px">${Icons.svg('download', { size: 15 })} Import from contacts</button>` : ''}
       <div class="field"><label>Name</label><input class="input" id="c-name" value="${UI.esc(c.name)}"></div>
-      <div class="field"><label>Phone / email</label><input class="input" id="c-contact" value="${UI.esc(c.contact)}"></div>
-      <div class="field"><label>Temperature</label><select class="input" id="c-type">${['Hot', 'Warm', 'Cold'].map((x) => `<option ${x === c.type ? 'selected' : ''}>${x}</option>`).join('')}</select></div>
-      <div class="field"><label>Next action</label><input class="input" id="c-action" value="${UI.esc(c.nextAction)}" placeholder="e.g. Follow-up call"></div>
+      <div class="field"><label>Phone</label><input class="input" id="c-phone" type="tel" value="${UI.esc(c.phone || '')}"></div>
+      <div class="field"><label>Email</label><input class="input" id="c-email" type="email" value="${UI.esc(c.email || '')}"></div>
+      <div class="field"><label>Lead stage</label><select class="input" id="c-stage">${CRM_STAGES.map((x) => `<option ${x === c.stage ? 'selected' : ''}>${x}</option>`).join('')}</select></div>
+      ${nextActionField(c.nextAction)}
       <div class="field"><label>Next action date</label><input class="input" id="c-date" type="date" value="${c.nextDate || ''}"></div>
       <div class="field"><label>Notes</label><textarea class="textarea" id="c-notes">${UI.esc(c.notes)}</textarea></div>
       <div class="btn-row">${id ? `<button class="btn danger" id="c-del">Delete</button>` : ''}<button class="btn gold" id="c-save">Save</button></div>`);
+    $('c-action-select').addEventListener('change', function () {
+      $('c-action-custom').style.display = this.value === '__custom__' ? '' : 'none';
+    });
+    if (canImport) $('c-import').addEventListener('click', importCrmContact);
     $('c-save').addEventListener('click', () => {
-      const obj = { name: $('c-name').value.trim(), contact: $('c-contact').value.trim(), type: $('c-type').value, nextAction: $('c-action').value.trim(), nextDate: $('c-date').value, notes: $('c-notes').value.trim(), updated: Date.now() };
+      const actionSel = $('c-action-select').value;
+      const nextAction = actionSel === '__custom__' ? $('c-action-custom').value.trim() : actionSel;
+      const obj = {
+        name: $('c-name').value.trim(), phone: $('c-phone').value.trim(), email: $('c-email').value.trim(),
+        stage: $('c-stage').value, nextAction, nextDate: $('c-date').value, notes: $('c-notes').value.trim(), updated: Date.now(),
+      };
       if (!obj.name) { UI.toast('Name required'); return; }
       if (id) Object.assign(c, obj); else s.crm.unshift({ id: S.uid(), ...obj });
       UI.closeSheet(); rerender(); UI.toast('Saved');
     });
     if (id) $('c-del').addEventListener('click', () => { s.crm = s.crm.filter((x) => x.id !== id); UI.closeSheet(); rerender(); UI.toast('Removed'); });
   }
+  // Contact Picker API — Android Chrome only (feature-detected above), no
+  // equivalent exists on iOS Safari or desktop browsers as of writing.
+  async function importCrmContact() {
+    try {
+      const props = ['name', 'tel', 'email'];
+      const [picked] = await navigator.contacts.select(props, { multiple: false });
+      if (!picked) return;
+      if (picked.name && picked.name[0]) $('c-name').value = picked.name[0];
+      if (picked.tel && picked.tel[0]) $('c-phone').value = picked.tel[0];
+      if (picked.email && picked.email[0]) $('c-email').value = picked.email[0];
+    } catch (e) { /* user cancelled the picker */ }
+  }
   function crmDone(id) {
     const s = S.get(); const c = s.crm.find((x) => x.id === id); if (!c) return;
     UI.openSheet(`<h3>Log next action</h3><p class="subtle">Completed: <b>${UI.esc(c.nextAction || 'action')}</b> for ${UI.esc(c.name)}.</p>
-      <div class="field" style="margin-top:12px"><label>What's the new next action?</label><input class="input" id="nd-action" placeholder="e.g. Send proposal"></div>
+      ${nextActionField('')}
       <div class="field"><label>When?</label><input class="input" id="nd-date" type="date" value="${S.addDays(S.todayKey(), 3)}"></div>
       <button class="btn gold" id="nd-save">Update</button>`);
+    $('c-action-select').addEventListener('change', function () {
+      $('c-action-custom').style.display = this.value === '__custom__' ? '' : 'none';
+    });
     $('nd-save').addEventListener('click', () => {
-      c.nextAction = $('nd-action').value.trim() || 'Follow up'; c.nextDate = $('nd-date').value; c.updated = Date.now();
+      const actionSel = $('c-action-select').value;
+      c.nextAction = (actionSel === '__custom__' ? $('c-action-custom').value.trim() : actionSel) || 'Follow up';
+      c.nextDate = $('nd-date').value; c.updated = Date.now();
       UI.closeSheet(); rerender(); UI.toast('Next action set');
     });
   }
@@ -603,8 +645,8 @@
       ${s.mode === 'coach' ? `<button class="choice icon-row" style="cursor:default"><span style="display:flex;align-items:center;color:var(--gold-ink)">${Icons.svg('target', { size: 17 })}</span><span>Your coach code — ${UI.esc(s.profile.coachCode || '—')}</span></button>` : ''}
       ${s.mode === 'agent' ? `<button class="choice icon-row" data-act="nav:goals">${Icons.svg('flag', { size: 17 })}<span>Goals & build framework</span></button>` : ''}
       <button class="choice icon-row" id="m-reminders">${Icons.svg('bell', { size: 17 })}<span>Reminders — ${s.settings.remindersEnabled ? 'On' : 'Off'} (${s.settings.reminderTime} / ${s.settings.eodTime})</span></button>
-      ${s.mode === 'agent' ? `<button class="choice icon-row" id="m-minimums">${Icons.svg('settings', { size: 17 })}<span>Adapt to missing data — ${s.settings.assumeMinimums ? 'On (assume minimums)' : 'Off'}</span></button>` : ''}
       ${s.mode === 'agent' ? `<button class="choice icon-row" data-act="switch-vertical">${Icons.svg('swap', { size: 17 })}<span>Switch version — currently ${Data.vertical().label}</span></button>` : ''}
+      ${s.mode === 'agent' ? `<button class="choice icon-row" id="m-coachcode">${Icons.svg('target', { size: 17 })}<span>${s.profile.coachId ? 'Coach — ' + UI.esc(s.profile.coachName) : "Link your coach's code"}</span></button>` : ''}
       <button class="choice icon-row" data-act="install-app">${Icons.svg('download', { size: 17 })}<span>Install app on this phone</span></button>
       <button class="choice icon-row" data-act="export-ics">${Icons.svg('calendar', { size: 17 })}<span>Add daily reminder to calendar</span></button>
       <button class="choice icon-row" data-act="backup-export">${Icons.svg('upload', { size: 17 })}<span>Export backup</span></button>
@@ -612,7 +654,32 @@
       <button class="choice icon-row" data-act="reset-app" style="color:var(--clay)">${Icons.svg('reset', { size: 17 })}<span>Reset all data</span></button>`);
     $('m-theme').addEventListener('click', () => { toggleTheme(); openMenu(); });
     $('m-reminders').addEventListener('click', remindersSheet);
-    if ($('m-minimums')) $('m-minimums').addEventListener('click', () => { s.settings.assumeMinimums = !s.settings.assumeMinimums; S.save(); UI.toast('Adaptive handling ' + (s.settings.assumeMinimums ? 'on' : 'off')); openMenu(); });
+    if ($('m-coachcode')) $('m-coachcode').addEventListener('click', linkCoachSheet);
+  }
+  function linkCoachSheet() {
+    const s = S.get();
+    UI.openSheet(`<h3>${s.profile.coachId ? 'Your coach' : 'Link your coach'}</h3>
+      <p class="subtle">${s.profile.coachId ? `You're linked to ${UI.esc(s.profile.coachName)}. Enter a new code to switch.` : "Enter the code your coach shared with you."}</p>
+      <div class="field" style="margin-bottom:0"><label>Coach access code</label>
+        <input class="input" id="lc-code" placeholder="e.g. HARRY-4821" value="${UI.esc(s.profile.coachCode || '')}"></div>
+      <div id="lc-status" class="subtle" style="margin-top:8px"></div>
+      <div class="btn-row" style="margin-top:14px"><button class="btn outline" data-act="close-sheet">Cancel</button>
+      <button class="btn gold" id="lc-save">Link coach</button></div>`);
+    $('lc-save').addEventListener('click', async () => {
+      const code = $('lc-code').value.trim();
+      if (!code) { UI.toast('Enter a code'); return; }
+      const btn = $('lc-save'); btn.setAttribute('disabled', ''); btn.textContent = 'Checking…';
+      const r = await Auth.linkCoach(code);
+      if (r.error) {
+        $('lc-status').textContent = r.error; $('lc-status').style.color = 'var(--clay)';
+        btn.removeAttribute('disabled'); btn.textContent = 'Link coach';
+        return;
+      }
+      s.profile.coachId = r.coach.id;
+      s.profile.coachName = r.coach.name;
+      s.profile.coachCode = code;
+      S.save(); UI.closeSheet(); UI.render(); UI.toast('Linked to ' + r.coach.name);
+    });
   }
   function remindersSheet() {
     const s = S.get();
@@ -736,6 +803,27 @@
     if (el) { el.focus(); if (pos != null) el.setSelectionRange(pos, pos); }
   }
 
+  // Live coach-code validation during onboarding — debounced so it doesn't
+  // fire a lookup on every keystroke, and only re-renders (which would
+  // otherwise steal focus mid-type) once the debounced result lands.
+  let coachLookupTimer = null;
+  function coachCodeInput(value) {
+    UI.onbTmp.coachCode = value;
+    UI.captureOnb();
+    clearTimeout(coachLookupTimer);
+    const code = value.trim();
+    if (!code) { UI.onbTmp.coachName = ''; UI.onbTmp.coachId = ''; UI.onbTmp.coachLookupStatus = ''; return; }
+    coachLookupTimer = setTimeout(async () => {
+      const r = await Auth.findCoachByCode(code);
+      if ((UI.onbTmp.coachCode || '').trim() !== code) return; // stale — field changed since
+      if (r.error) { UI.onbTmp.coachName = ''; UI.onbTmp.coachId = ''; UI.onbTmp.coachLookupStatus = 'notfound'; }
+      else { UI.onbTmp.coachName = r.coach.name; UI.onbTmp.coachId = r.coach.id; UI.onbTmp.coachLookupStatus = 'found'; }
+      const active = document.activeElement; const id = active && active.id; const pos = active && active.selectionStart;
+      UI.render();
+      const el = id && $(id); if (el) { el.focus(); if (pos != null) el.setSelectionRange(pos, pos); }
+    }, 500);
+  }
+
   // expose a few for debugging
-  global.App = { rerender, scheduleReminders, pipeSearch };
+  global.App = { rerender, scheduleReminders, pipeSearch, coachCodeInput };
 })(window);
