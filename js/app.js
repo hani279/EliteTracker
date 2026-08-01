@@ -583,7 +583,7 @@
   /* ---------- build framework + goals ---------- */
   function buildSheet() {
     const bf = S.get().buildFramework;
-    UI.openSheet(`<h3>Build the best agent</h3>
+    UI.openSheet(`<h3>Build the best consultant</h3>
       <div class="field"><label>Goal</label><input class="input" id="b-goal" value="${UI.esc(bf.goal)}"></div>
       <div class="field"><label>Proof</label><input class="input" id="b-proof" value="${UI.esc(bf.proof)}"></div>
       <div class="field"><label>Steps (one per line)</label><textarea class="textarea" id="b-steps">${UI.esc((bf.steps || []).join('\n'))}</textarea></div>
@@ -611,7 +611,7 @@
 
   /* ---------- coach client drill-in ---------- */
   function coachClientSheet(id) {
-    const s = S.get(); const c = s.coachRoster.find((x) => x.id === id) || { id, name: 'Agent', type: '', pace: 0, streak: 0, status: '' };
+    const s = S.get(); const c = s.coachRoster.find((x) => x.id === id) || { id, name: 'Consultant', type: '', pace: 0, streak: 0, status: '' };
     UI.openSheet(`<h3>${UI.esc(c.name)}</h3>
       <div class="kv"><span class="k">Type</span><span class="v">${UI.esc(c.type)}</span></div>
       <div class="kv"><span class="k">Status</span><span class="v">${UI.esc(c.status)}</span></div>
@@ -659,6 +659,7 @@
       <button class="choice icon-row" data-act="install-app">${Icons.svg('download', { size: 17 })}<span>Install app on this phone</span></button>
       <button class="choice icon-row" data-act="export-ics">${Icons.svg('calendar', { size: 17 })}<span>Add daily reminder to calendar</span></button>
       <button class="choice icon-row" data-act="backup-export">${Icons.svg('upload', { size: 17 })}<span>Export backup</span></button>
+      <button class="choice icon-row" data-act="backup-import">${Icons.svg('download', { size: 17 })}<span>Restore backup</span></button>
       <button class="choice icon-row" data-act="log-out">${Icons.svg('logout', { size: 17 })}<span>Log out</span></button>
       <button class="choice icon-row" data-act="reset-app" style="color:var(--clay)">${Icons.svg('reset', { size: 17 })}<span>Reset all data</span></button>`);
     $('m-theme').addEventListener('click', () => { toggleTheme(); openMenu(); });
@@ -670,10 +671,11 @@
     UI.openSheet(`<h3>${s.profile.coachId ? 'Your coach' : 'Link your coach'}</h3>
       <p class="subtle">${s.profile.coachId ? `You're linked to ${UI.esc(s.profile.coachName)}. Enter a new code to switch.` : "Enter the code your coach shared with you."}</p>
       <div class="field" style="margin-bottom:0"><label>Coach access code</label>
-        <input class="input" id="lc-code" placeholder="e.g. HARRY-4821" value="${UI.esc(s.profile.coachCode || '')}"></div>
+        <input class="input" id="lc-code" style="letter-spacing:4px;font-family:var(--mono);text-align:center;max-width:120px" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="0000" value="${UI.esc(s.profile.coachCode || '')}"></div>
       <div id="lc-status" class="subtle" style="margin-top:8px"></div>
       <div class="btn-row" style="margin-top:14px"><button class="btn outline" data-act="close-sheet">Cancel</button>
       <button class="btn gold" id="lc-save">Link coach</button></div>`);
+    $('lc-code').addEventListener('input', function () { this.value = this.value.replace(/\D/g, '').slice(0, 4); });
     $('lc-save').addEventListener('click', async () => {
       const code = $('lc-code').value.trim();
       if (!code) { UI.toast('Enter a code'); return; }
@@ -818,20 +820,26 @@
   // otherwise steal focus mid-type) once the debounced result lands.
   let coachLookupTimer = null;
   function coachCodeInput(value) {
-    UI.onbTmp.coachCode = value;
+    // Fixed 4-digit field — strip anything that isn't a digit (no room
+    // for the stray-space typos this was meant to prevent) and cap at 4
+    // characters, writing the sanitized value straight back into the
+    // field so what's shown always matches what's actually stored.
+    const digits = value.replace(/\D/g, '').slice(0, 4);
+    const el = document.getElementById('onb-code');
+    if (el && el.value !== digits) el.value = digits;
+    UI.onbTmp.coachCode = digits;
     UI.captureOnb();
     clearTimeout(coachLookupTimer);
-    const code = value.trim();
-    if (!code) { UI.onbTmp.coachName = ''; UI.onbTmp.coachId = ''; UI.onbTmp.coachLookupStatus = ''; return; }
+    if (digits.length < 4) { UI.onbTmp.coachName = ''; UI.onbTmp.coachId = ''; UI.onbTmp.coachLookupStatus = ''; return; }
     coachLookupTimer = setTimeout(async () => {
-      const r = await Auth.findCoachByCode(code);
-      if ((UI.onbTmp.coachCode || '').trim() !== code) return; // stale — field changed since
+      const r = await Auth.findCoachByCode(digits);
+      if ((UI.onbTmp.coachCode || '') !== digits) return; // stale — field changed since
       if (r.error) { UI.onbTmp.coachName = ''; UI.onbTmp.coachId = ''; UI.onbTmp.coachLookupStatus = 'notfound'; }
       else { UI.onbTmp.coachName = r.coach.name; UI.onbTmp.coachId = r.coach.id; UI.onbTmp.coachLookupStatus = 'found'; }
       const active = document.activeElement; const id = active && active.id; const pos = active && active.selectionStart;
       UI.render();
-      const el = id && $(id); if (el) { el.focus(); if (pos != null) el.setSelectionRange(pos, pos); }
-    }, 500);
+      const elAfter = id && $(id); if (elAfter) { elAfter.focus(); if (pos != null) elAfter.setSelectionRange(pos, pos); }
+    }, 400);
   }
 
   // expose a few for debugging

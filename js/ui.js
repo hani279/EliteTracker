@@ -93,7 +93,7 @@
       <h2>How will you use ELITE Tracker?</h2>
       <p class="lead">This decides what you see from here on — a daily tracker, or a coach's view across a roster.</p>
       <button class="choice" data-act="onb-role:agent">
-        <div class="ct">I'm an Agent</div>
+        <div class="ct">I'm a Consultant</div>
         <div class="cs">Log daily numbers, get coached, track your own pipeline and goals.</div>
       </button>
       <button class="choice" data-act="onb-role:coach">
@@ -172,7 +172,7 @@
         <div class="field"><label>Your name</label>
           <input class="input" id="onb-name" placeholder="e.g. Jordan Avery" value="${esc(onbTmp.name)}" oninput="UI.captureOnb()"></div>
         <div class="field" style="margin-bottom:0"><label>Coach access code (optional)</label>
-          <input class="input" id="onb-code" placeholder="e.g. HARRY-4821" value="${esc(onbTmp.coachCode)}" oninput="App.coachCodeInput(this.value)">
+          <input class="input" id="onb-code" style="letter-spacing:4px;font-family:var(--mono);text-align:center;max-width:120px" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="0000" value="${esc(onbTmp.coachCode)}" oninput="App.coachCodeInput(this.value)">
           ${statusHtml}
         </div>
       </div>
@@ -183,9 +183,13 @@
   }
 
   /* ---------- coach onboarding ---------- */
-  function generateCoachCode(name) {
-    const base = (name || 'coach').trim().split(/\s+/)[0].toUpperCase().replace(/[^A-Z]/g, '') || 'COACH';
-    return `${base}-${Math.floor(1000 + Math.random() * 9000)}`;
+  // Fixed 4-digit code, not the old NAME-1234 format — short enough to
+  // type as a single numeric field with no room for stray spaces or
+  // casing mismatches. Old-format codes already shared by existing
+  // coaches keep working (find_coach_by_code is a plain string match,
+  // unaffected by what shape *new* codes take).
+  function generateCoachCode() {
+    return String(Math.floor(1000 + Math.random() * 9000));
   }
 
   function stepCoachProfile() {
@@ -204,7 +208,7 @@
   }
 
   function stepCoachCode() {
-    if (!onbTmp.coachCodeGen) onbTmp.coachCodeGen = generateCoachCode(onbTmp.name);
+    if (!onbTmp.coachCodeGen) onbTmp.coachCodeGen = generateCoachCode();
     return `<h2>You're set</h2>
       <p class="lead">Share this code with your clients — they'll enter it when they sign up so their numbers reach you.</p>
       <div class="card-light" style="text-align:center">
@@ -231,7 +235,7 @@
   }
 
   function stepGoal() {
-    return `<h2>Build the best agent</h2>
+    return `<h2>Build the best consultant</h2>
       <p class="lead">Your operating framework: the Goal, the Proof it's working, and the Steps to get there.</p>
       <div class="card-light">
         <div class="field"><label>Goal — what are you chasing?</label>
@@ -279,7 +283,7 @@
       s.profile.coachCode = onbTmp.coachCodeGen || '';
     } else {
       s.mode = 'agent';
-      s.profile.name = onbTmp.name || 'Agent';
+      s.profile.name = onbTmp.name || 'Consultant';
       s.profile.coachName = onbTmp.coachName || 'your coach';
       s.profile.coachCode = onbTmp.coachCode || '';
       s.buildFramework = { goal: onbTmp.goal, proof: onbTmp.proof, steps: onbTmp.steps.filter(Boolean) };
@@ -605,34 +609,16 @@
   /* ============================================================
      AGENT — CRM
      ============================================================ */
+  // Disabled for now — the CRM is being rethought as a bigger project
+  // than a simple contact list. The rest of the CRM code (data model,
+  // sync, the add/edit sheet) is left in place underneath this so it's
+  // a one-line flip to bring back, not a rebuild.
   function viewCRM() {
-    const s = S.get();
-    const overdue = s.crm.filter((c) => c.nextDate && c.nextDate < S.todayKey());
-    const sorted = [...s.crm].sort((a, b) => (a.nextDate || '9999').localeCompare(b.nextDate || '9999'));
     return `<section class="screen active">
-      <div class="card" style="display:flex;justify-content:space-between;align-items:center">
-        <div><div style="font-weight:600">${s.crm.length} contacts</div><div class="subtle">${overdue.length} next-action(s) overdue</div></div>
-        <button class="btn gold sm" data-act="add-crm">${Icons.svg('plus', { size: 14 })} Contact</button>
-      </div>
-      <div class="card"><div class="section-title">Next actions</div>
-        ${sorted.map((c) => {
-          const od = c.nextDate && c.nextDate < S.todayKey();
-          const stageTone = c.stage === 'Won' ? 'green' : c.stage === 'Lost' ? 'red' : c.stage === 'Negotiating' ? 'gold' : '';
-          return `<div class="lrow" data-act="edit-crm:${c.id}">
-            <div class="mono">${initials(c.name)}</div>
-            <div class="main"><div class="t">${esc(c.name)} <span class="tag ${stageTone}" style="margin-left:4px">${esc(c.stage || '')}</span></div>
-            <div class="s">${esc(c.nextAction || 'No next action')}</div></div>
-            <div class="right"><div class="subtle" style="font-size:11px;color:${od ? 'var(--clay)' : 'var(--muted)'}">${c.nextDate ? S.fmtShort(c.nextDate) : ''}</div>
-            <button class="tag green" data-act="crm-done:${c.id}" style="margin-top:4px">Done</button></div>
-          </div>`;
-        }).join('') || emptyState('No contacts yet.')}
-      </div>
-      <div class="card"><div class="section-title">Backup & restore</div>
-        <p class="subtle" style="margin:0 0 10px">Your CRM and all data lives on this device. Export a backup file regularly, or restore from one.</p>
-        <div class="btn-row">
-          <button class="btn outline" data-act="backup-export">${Icons.svg('download', { size: 15 })} Export backup</button>
-          <button class="btn outline" data-act="backup-import">${Icons.svg('upload', { size: 15 })} Restore</button>
-        </div>
+      <div class="card" style="text-align:center;padding:40px 20px">
+        ${Icons.svg('user', { size: 28 })}
+        <h3 style="margin:14px 0 6px">CRM — Launching soon</h3>
+        <p class="subtle" style="margin:0">We're building something bigger than a simple contact list here. Check back soon.</p>
       </div>
     </section>`;
   }
@@ -663,13 +649,6 @@
         <ul class="list-plain">${r.improve.map((w) => `<li><span class="mk warn">${Icons.svg('target', { size: 14 })}</span><span>${esc(w)}</span></li>`).join('') || '<li class="subtle">Nothing flagged — strong period.</li>'}</ul>
       </div>
 
-      <div class="card"><h3>${esc(r.coachName)}'s playbook — get better</h3>
-        ${r.suggestions.map((t) => `<div class="callout ${t.tone === 'good' ? 'green' : ''}">${Icons.svg(t.tone === 'good' ? 'check' : 'target', { size: 15 })}<span>${esc(t.text)}</span></div>`).join('')}
-      </div>
-      <div class="card"><div class="section-title">Predictive — next moves</div>
-        ${r.predictive.plans.map((p) => `<div class="callout">${Icons.svg('target', { size: 15 })}<span>${esc(p.text)}</span></div>`).join('')}
-      </div>
-
       <div class="btn-row" style="margin-top:14px">
         <button class="btn gold" data-act="send-report">Send to ${esc(r.coachName)}</button>
         <button class="btn outline" data-act="copy-report">Copy</button>
@@ -695,7 +674,7 @@
   function viewGoals() {
     const s = S.get(); const bf = s.buildFramework;
     return `<section class="screen active">
-      <div class="card"><h3>Build the best agent</h3>
+      <div class="card"><h3>Build the best consultant</h3>
         <div class="kv"><span class="k">Goal</span><span class="v" style="text-align:right;max-width:60%">${esc(bf.goal || '—')}</span></div>
         <div class="kv"><span class="k">Proof</span><span class="v" style="text-align:right;max-width:60%">${esc(bf.proof || '—')}</span></div>
         <div class="section-title" style="margin-top:12px">Steps</div>
@@ -743,7 +722,7 @@
     const s = S.get();
     if (!s.coachRoster.length) return coachEmptyState();
     return `<section class="screen active">
-      <div class="card"><p class="subtle" style="margin:0">Full client roster — each agent's own pace, streak and check-ins, pulled live from their data.</p></div>
+      <div class="card"><p class="subtle" style="margin:0">Full client roster — each consultant's own pace, streak and check-ins, pulled live from their data.</p></div>
       ${s.coachRoster.map((c) => `<div class="card" style="display:flex;align-items:center;gap:12px" data-act="coach-client:${esc(c.id)}">
         <div class="avatar lg">${initials(c.name)}</div>
         <div style="flex:1"><div style="font-weight:600">${esc(c.name)}</div><div class="subtle">${esc(c.type)} · ${c.pace}% pace · ${c.streak}-day streak</div></div>
@@ -771,8 +750,8 @@
     return `<section class="screen active">
       <div class="card" style="text-align:center;padding:32px 20px">
         ${Icons.svg('users', { size: 28 })}
-        <h3 style="margin:12px 0 6px">No agents linked yet</h3>
-        <p class="subtle" style="margin:0 0 14px">Share your coach code so agents can join your roster.</p>
+        <h3 style="margin:12px 0 6px">No consultants linked yet</h3>
+        <p class="subtle" style="margin:0 0 14px">Share your coach code so consultants can join your roster.</p>
         <div class="kv" style="justify-content:center;gap:8px"><span class="tag gold" style="font-family:var(--mono);font-size:15px;padding:6px 14px">${esc(s.profile.coachCode || '—')}</span></div>
       </div>
     </section>`;

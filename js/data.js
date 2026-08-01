@@ -11,7 +11,7 @@
   const VERTICALS = {
     realestate: {
       label: 'Real Estate',
-      roleLabel: 'Real Estate Agent',
+      roleLabel: 'Real Estate Consultant',
       activity: [
         { key: 'calls',        label: 'Calls',              short: 'Calls', target: 20, minutesEach: 4 },
         { key: 'conversations',label: 'Conversations',      short: 'Conv',  target: 8,  minutesEach: 6 },
