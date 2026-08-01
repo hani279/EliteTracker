@@ -640,8 +640,31 @@
       <div class="kv"><span class="k">Last check-in</span><span class="v">${UI.esc(c.last || '—')}</span></div>
       <div class="callout" style="margin-top:14px">${Icons.svg('target', { size: 15 })}<span>${coachClientTip(c)}</span></div>
       <div class="btn-row" style="margin-top:14px"><button class="btn outline" data-act="close-sheet">Close</button>
-      <button class="btn gold" id="cc-msg">Send nudge</button></div>`);
+      <button class="btn gold" id="cc-msg">Send nudge</button></div>
+      <button class="btn outline" id="cc-report" style="margin-top:10px;width:100%">${Icons.svg('file', { size: 15 })} Send daily report</button>`);
     $('cc-msg').addEventListener('click', () => sendNudge(c));
+    $('cc-report').addEventListener('click', () => dailyReportSheet(c));
+  }
+  function buildDailyReportDraft(c) {
+    return `Hi ${c.name.split(' ')[0]} — here's your daily rundown.\n\n`
+      + `Pace this week: ${c.pace}% · Streak: ${c.streak} day${c.streak === 1 ? '' : 's'} · Status: ${c.status}\n`
+      + `Last check-in: ${c.last || '—'}\n\n${coachClientTip(c)}`;
+  }
+  function dailyReportSheet(c) {
+    UI.openSheet(`<h3>Daily report — ${UI.esc(c.name)}</h3>
+      <p class="subtle">Auto-drafted from ${UI.esc(c.name)}'s pace data. Edit before sending — it lands in their app as an in-app message, not a push notification.</p>
+      <div class="field" style="margin-top:12px;margin-bottom:0"><label>Message</label>
+        <textarea class="textarea" id="dr-body" style="min-height:160px">${UI.esc(buildDailyReportDraft(c))}</textarea></div>
+      <div class="btn-row" style="margin-top:14px"><button class="btn outline" data-act="close-sheet">Cancel</button>
+      <button class="btn gold" id="dr-send">Send report</button></div>`);
+    $('dr-send').addEventListener('click', async () => {
+      const body = $('dr-body').value.trim();
+      if (!body) { UI.toast('Write something first'); return; }
+      const btn = $('dr-send'); btn.setAttribute('disabled', ''); btn.textContent = 'Sending…';
+      const r = await Sync.sendCoachMessage(c.id, 'Daily report', body);
+      if (r.error) { UI.toast('Could not send — ' + r.error); btn.removeAttribute('disabled'); btn.textContent = 'Send report'; return; }
+      UI.closeSheet(); UI.toast('Report sent to ' + c.name);
+    });
   }
   async function sendNudge(c) {
     UI.closeSheet();
@@ -673,6 +696,7 @@
       <button class="choice icon-row" id="m-theme">${Icons.svg(s.settings.theme === 'light' ? 'sun' : 'moon', { size: 17 })}<span>Appearance — ${s.settings.theme === 'light' ? 'Light' : 'Dark'}</span></button>
       ${s.mode === 'coach' ? `<button class="choice icon-row" style="cursor:default"><span style="display:flex;align-items:center;color:var(--gold-ink)">${Icons.svg('target', { size: 17 })}</span><span>Your coach code — ${UI.esc(s.profile.coachCode || '—')}</span></button>` : ''}
       ${s.mode === 'agent' ? `<button class="choice icon-row" data-act="nav:goals">${Icons.svg('flag', { size: 17 })}<span>Goals & build framework</span></button>` : ''}
+      ${s.mode === 'agent' ? `<button class="choice icon-row" id="m-inbox">${Icons.svg('inbox', { size: 17 })}<span>Messages from your coach</span></button>` : ''}
       <button class="choice icon-row" id="m-reminders">${Icons.svg('bell', { size: 17 })}<span>Reminders — ${s.settings.remindersEnabled ? 'On' : 'Off'} (${s.settings.reminderTime} / ${s.settings.eodTime})</span></button>
       ${s.mode === 'agent' ? `<button class="choice icon-row" data-act="switch-vertical">${Icons.svg('swap', { size: 17 })}<span>Switch version — currently ${Data.vertical().label}</span></button>` : ''}
       ${s.mode === 'agent' ? `<button class="choice icon-row" id="m-coachcode">${Icons.svg('target', { size: 17 })}<span>${s.profile.coachId ? 'Coach — ' + UI.esc(s.profile.coachName) : "Link your coach's code"}</span></button>` : ''}
@@ -685,6 +709,7 @@
     $('m-theme').addEventListener('click', () => { toggleTheme(); openMenu(); });
     $('m-reminders').addEventListener('click', remindersSheet);
     if ($('m-coachcode')) $('m-coachcode').addEventListener('click', linkCoachSheet);
+    if ($('m-inbox')) $('m-inbox').addEventListener('click', inboxSheet);
   }
   function linkCoachSheet() {
     const s = S.get();
@@ -712,6 +737,26 @@
       s.settings.coachName = r.coach.name;
       S.save(); UI.closeSheet(); UI.render(); UI.toast('Linked to ' + r.coach.name);
     });
+  }
+  async function inboxSheet() {
+    UI.openSheet(`<h3>Messages from your coach</h3><p class="subtle">Loading…</p>`);
+    const messages = await Sync.fetchInbox();
+    if (!messages.length) {
+      UI.openSheet(`<h3>Messages from your coach</h3>
+        <div class="empty">${Icons.svg('inbox', { size: 26 })}No messages yet.</div>
+        <button class="btn outline" data-act="close-sheet" style="margin-top:10px;width:100%">Close</button>`);
+      return;
+    }
+    UI.openSheet(`<h3>Messages from your coach</h3>
+      ${messages.map((m) => `<div class="card" style="margin:0 0 10px${m.read ? '' : ';border-color:var(--gold-dim)'}">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
+          <div style="font-weight:600">${UI.esc(m.title)}${m.read ? '' : ' <span class=\"pill\">new</span>'}</div>
+          <div class="subtle" style="font-size:11px">${new Date(m.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</div>
+        </div>
+        <p class="subtle" style="margin:0;white-space:pre-wrap;color:var(--bone)">${UI.esc(m.body)}</p>
+      </div>`).join('')}
+      <button class="btn outline" data-act="close-sheet" style="width:100%">Close</button>`);
+    messages.filter((m) => !m.read).forEach((m) => Sync.markMessageRead(m.id));
   }
   function remindersSheet() {
     const s = S.get();

@@ -323,5 +323,29 @@
     } catch (e) { console.warn('roster refresh failed', e); }
   }
 
-  global.Sync = { push, pull, refreshRoster };
+  /* ---------- coach messages (daily reports, review-before-send) ----------
+     Deliberately not routed through push()/pull() — these are one-way,
+     coach-writes/agent-reads rows with their own RLS shape, fetched
+     on demand when either side actually opens the relevant sheet
+     rather than carried in the main local-first state blob. */
+  async function sendCoachMessage(agentId, title, body) {
+    const c = client(); const session = global.Auth && Auth.getSession();
+    if (!c || !session) return { error: 'Not connected — check your internet connection.' };
+    const { error } = await c.from('coach_messages').insert({ coach_id: session.id, agent_id: agentId, title, body });
+    if (error) return { error: error.message };
+    return { ok: true };
+  }
+  async function fetchInbox() {
+    const c = client(); const session = global.Auth && Auth.getSession();
+    if (!c || !session) return [];
+    const { data, error } = await c.from('coach_messages').select('*').eq('agent_id', session.id).order('created_at', { ascending: false });
+    if (error) { console.warn('fetch inbox failed', error); return []; }
+    return data || [];
+  }
+  async function markMessageRead(id) {
+    const c = client(); if (!c) return;
+    try { await c.from('coach_messages').update({ read: true }).eq('id', id); } catch (e) { /* best-effort */ }
+  }
+
+  global.Sync = { push, pull, refreshRoster, sendCoachMessage, fetchInbox, markMessageRead };
 })(window);
