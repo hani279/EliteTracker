@@ -93,7 +93,7 @@
     return `<div class="onb">
       <div class="brand"><span class="dia"></span><span class="nm">ELITE</span><span class="tk">TRACKER</span></div>
       <h2>${isSignup ? 'Create your account' : 'Welcome back'}</h2>
-      <p class="lead">${isSignup ? 'Set up ELITE Tracker in a minute — your coach sees you show up from day one.' : 'Log in to pick up where you left off.'}</p>
+      <p class="lead">${isSignup ? 'Start today. Track your activity, hit your targets and keep your coach in the loop.' : 'Log in to pick up where you left off.'}</p>
 
       <button class="btn-google" data-act="auth-google">${googleMark()}<span>Continue with Google</span></button>
       <div class="divider"><span>or continue with email</span></div>
