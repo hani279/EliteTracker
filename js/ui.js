@@ -309,6 +309,7 @@
           const st = S.get();
           st.profile.coachId = r.coachLinkResult.coach.id;
           st.profile.coachName = r.coachLinkResult.coach.name;
+          st.settings.coachName = r.coachLinkResult.coach.name;
           S.save(); render();
         } else if (r.coachLinkResult.error && onbTmp.coachCode) {
           toast("Coach code not found — you can add it later in Settings.");

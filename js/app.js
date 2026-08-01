@@ -678,6 +678,7 @@
       s.profile.coachId = r.coach.id;
       s.profile.coachName = r.coach.name;
       s.profile.coachCode = code;
+      s.settings.coachName = r.coach.name;
       S.save(); UI.closeSheet(); UI.render(); UI.toast('Linked to ' + r.coach.name);
     });
   }

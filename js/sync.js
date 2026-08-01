@@ -128,15 +128,14 @@
       s.profile.brand = profileRow.brand || '';
       s.profile.coachCode = profileRow.coach_code || s.profile.coachCode || '';
       s.profile.role = profileRow.role === 'coach' ? 'Head Coach' : s.profile.role;
-      // coach_id is the only thing linking an agent to their coach — the
-      // coach's display name lives on the coach's own row, not this one.
-      if (profileRow.coach_id) {
-        s.profile.coachId = profileRow.coach_id;
-        const { data: coachRow } = await c.from('profiles').select('name').eq('id', profileRow.coach_id).maybeSingle();
-        if (coachRow && coachRow.name) s.profile.coachName = coachRow.name;
-      } else {
-        s.profile.coachId = '';
-      }
+      // coach_id lives on this row (readable — it's the agent's own), but
+      // RLS only lets a coach read *their* agents' rows, not the reverse —
+      // an agent reading the coach's own row for their display name comes
+      // back empty. Rather than grant broader read access, the coach's
+      // name is mirrored into this row's own settings JSON at link time
+      // (see linkCoach() callers), so it's always readable here too.
+      s.profile.coachId = profileRow.coach_id || '';
+      if (profileRow.settings && profileRow.settings.coachName) s.profile.coachName = profileRow.settings.coachName;
       if (profileRow.targets && Object.keys(profileRow.targets).length) s.targets = profileRow.targets;
       if (profileRow.focus_template && profileRow.focus_template.length) s.focusTemplate = profileRow.focus_template;
       if (profileRow.build_framework) s.buildFramework = profileRow.build_framework;
