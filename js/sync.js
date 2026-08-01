@@ -56,7 +56,10 @@
       targets: s.targets,
       focus_template: s.focusTemplate,
       build_framework: s.buildFramework,
-      settings: s.settings,
+      // twoWeekFocus rides along in settings rather than its own column
+      // (same trick used for coachName in pull(), below) — one less
+      // migration to ask for, and this JSONB blob is already schema-free.
+      settings: Object.assign({}, s.settings, { twoWeekFocus: s.twoWeekFocus }),
     }).eq('id', pid);
 
     const days = Object.keys(s.days || {}).map((key) => {
@@ -136,6 +139,7 @@
       // (see linkCoach() callers), so it's always readable here too.
       s.profile.coachId = profileRow.coach_id || '';
       if (profileRow.settings && profileRow.settings.coachName) s.profile.coachName = profileRow.settings.coachName;
+      if (profileRow.settings && profileRow.settings.twoWeekFocus) s.twoWeekFocus = profileRow.settings.twoWeekFocus;
       if (profileRow.targets && Object.keys(profileRow.targets).length) s.targets = profileRow.targets;
       if (profileRow.focus_template && profileRow.focus_template.length) s.focusTemplate = profileRow.focus_template;
       if (profileRow.build_framework) s.buildFramework = profileRow.build_framework;

@@ -31,6 +31,7 @@
       goals: [],                // life & business goals grid
       targets: {},              // metricKey -> daily target (per vertical, seeded)
       focusTemplate: [],        // recurring daily focus tasks
+      twoWeekFocus: [],         // {id,text,done} — priorities for the next 2 weeks, not day-specific
       days: {},                 // 'YYYY-MM-DD' -> day record
       pipeline: [],
       crm: [],

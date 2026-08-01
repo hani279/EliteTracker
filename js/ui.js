@@ -416,6 +416,8 @@
         </div>
       </div>
 
+      ${twoWeekFocusCard()}
+
       <div class="card">
         <h3>Today's focus <span class="pill">${doneFocus}/${day.focus.length}</span>
           <button class="btn ghost sm" data-act="focus-to-calendar" title="Add today's timed focus blocks to your calendar">${Icons.svg('calendar', { size: 13 })}</button>
@@ -431,6 +433,8 @@
           <button class="btn ${day.reviewedEOD ? 'outline' : 'gold'} sm" data-act="eod-review">${day.reviewedEOD ? Icons.svg('check', { size: 14 }) + ' Day reviewed' : 'End-of-day review'}</button>
         </div>
       </div>
+
+      ${salesFunnelCard()}
 
       <div class="card">
         <h3>Log today's numbers <span class="pill">${Data.vertical().label}</span></h3>
@@ -465,11 +469,6 @@
       </div>
 
       <div class="card">
-        <h3>This week's activity</h3>
-        ${weekBars()}
-      </div>
-
-      <div class="card">
         <h3>Predictive plan — tomorrow</h3>
         ${pred.plans.map((p, i) => `<div class="callout" style="margin-top:${i ? 8 : 0}px">${Icons.svg('target', { size: 15 })}<span>${esc(p.text)}</span></div>`).join('')}
       </div>
@@ -479,6 +478,23 @@
         <p class="subtle" style="margin:0">${s.buildFramework.goal ? esc(s.buildFramework.goal) : 'Set what every call is ultimately for.'}</p>
       </div>
     </section>`;
+  }
+
+  function twoWeekFocusCard() {
+    const s = S.get();
+    const items = s.twoWeekFocus || [];
+    const done = items.filter((f) => f.done).length;
+    return `<div class="card">
+      <h3>Two-Week Focus <span class="pill">${done}/${items.length}</span></h3>
+      <p class="subtle" style="margin:0 0 10px">Your priorities for the next two weeks — not tied to any single day.</p>
+      ${items.map((f) => `
+        <div class="focus-item ${f.done ? 'done' : ''}" data-act="twfocus:${f.id}">
+          <div class="check ${f.done ? 'done' : ''}">${f.done ? Icons.svg('check', { size: 12 }) : ''}</div>
+          <div class="txt">${esc(f.text)}</div>
+          <button class="icon-btn sm" data-act="twfocus-del:${f.id}" title="Remove" style="flex:0 0 auto">${Icons.svg('close', { size: 13 })}</button>
+        </div>`).join('') || '<p class="subtle" style="margin:8px 0">No priorities set yet.</p>'}
+      <button class="btn ghost sm" data-act="add-twfocus" style="margin-top:12px">${Icons.svg('plus', { size: 14 })} Add priority</button>
+    </div>`;
   }
 
   function numberRow(m, day) {
@@ -495,15 +511,35 @@
       </div></div>`;
   }
 
-  function weekBars() {
+  // ---- traffic-light pace color, used by the funnel below ----
+  function paceColor(pct) { return pct >= 75 ? 'var(--pace-green)' : pct >= 45 ? 'var(--pace-amber)' : 'var(--pace-red)'; }
+
+  function salesFunnelCard() {
     const agg = Intel.aggregate(Intel.rangeKeys('weekly'));
-    const defs = Data.activityDefs();
-    const max = Math.max(...defs.map((d) => Math.max(agg.metrics[d.key].actual, agg.metrics[d.key].target, 1)));
-    return `<div class="bars">${defs.map((d) => {
-      const m = agg.metrics[d.key]; const h = Math.round((m.actual / max) * 100);
-      const cls = m.actual >= m.target ? 'over' : (m.actual < m.target * 0.7 ? 'under' : '');
-      return `<div class="bar"><div class="n">${m.actual}</div><div class="col ${cls}" style="height:${Math.max(6, h)}%"></div><div class="lbl">${esc(d.short)}</div></div>`;
-    }).join('')}</div>`;
+    const funnelKeys = Data.vertical().funnel;
+    const stages = funnelKeys.map((key) => {
+      const m = agg.metrics[key];
+      return { key, label: m.label, actual: m.actual, target: m.target, pace: Intel.metricPace(m) };
+    });
+    const maxActual = Math.max(...stages.map((s) => s.actual), 1);
+    const tips = Intel.suggestions(agg);
+    const topTip = tips.find((t) => t.tone === 'warn') || tips[0];
+
+    return `<div class="card">
+      <h3>Activity Funnel <span class="pill">This week</span></h3>
+      <div class="funnel">
+        ${stages.map((s, i) => {
+          const widthPct = Math.max(22, Math.round((s.actual / maxActual) * 100));
+          const color = paceColor(s.pace);
+          const conv = i > 0 && stages[i - 1].actual > 0 ? `<div class="funnel-conv">↓ ${Math.round((s.actual / stages[i - 1].actual) * 100)}%</div>` : '';
+          return `${conv}<div class="funnel-row">
+            <div class="funnel-bar-wrap"><div class="funnel-bar" style="width:${widthPct}%;background:${color}"><span class="funnel-count">${s.actual}</span></div></div>
+            <div class="funnel-meta"><span class="funnel-label">${esc(s.label)}</span><span class="funnel-pace" style="color:${color}">${s.pace}%</span></div>
+          </div>`;
+        }).join('')}
+      </div>
+      ${topTip ? `<div class="callout ${topTip.tone === 'good' ? 'green' : ''}" style="margin-top:14px">${Icons.svg(topTip.tone === 'good' ? 'check' : 'target', { size: 15 })}<span>${esc(topTip.text)}</span></div>` : ''}
+    </div>`;
   }
 
   /* ============================================================

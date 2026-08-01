@@ -122,6 +122,11 @@
     // ---- focus / to-do ----
     if (cmd === 'focus') { const d = S.dayRecord(); const f = d.focus.find((x) => x.id === a); if (f) f.done = !f.done; rerender(); return; }
     if (cmd === 'add-focus') return addFocusSheet();
+
+    // ---- two-week focus ----
+    if (cmd === 'twfocus') { const s = S.get(); const f = (s.twoWeekFocus || []).find((x) => x.id === a); if (f) f.done = !f.done; rerender(); return; }
+    if (cmd === 'twfocus-del') { e.stopPropagation(); const s = S.get(); s.twoWeekFocus = (s.twoWeekFocus || []).filter((x) => x.id !== a); rerender(); return; }
+    if (cmd === 'add-twfocus') return addTwoWeekFocusSheet();
     if (cmd === 'eod-review') return eodReview();
 
     // ---- number logging ----
@@ -263,6 +268,21 @@
       const text = $('ft-text').value.trim(); if (!text) return;
       S.dayRecord().focus.push({ id: 'f' + S.uid(), text, time: $('ft-time').value.trim(), done: false });
       UI.closeSheet(); rerender(); UI.toast('Task added');
+    });
+  }
+
+  function addTwoWeekFocusSheet() {
+    UI.openSheet(`<h3>Add a priority</h3>
+      <p class="subtle">A goal for the next two weeks — not a daily task.</p>
+      <div class="field" style="margin-top:12px"><label>Priority</label><input class="input" id="twf-text" placeholder="e.g. Close the Marsh St listing"></div>
+      <div class="btn-row"><button class="btn outline" data-act="close-sheet">Cancel</button>
+      <button class="btn gold" id="twf-save">Add</button></div>`);
+    $('twf-save').addEventListener('click', () => {
+      const text = $('twf-text').value.trim(); if (!text) return;
+      const s = S.get();
+      s.twoWeekFocus = s.twoWeekFocus || [];
+      s.twoWeekFocus.push({ id: 'twf' + S.uid(), text, done: false });
+      UI.closeSheet(); rerender(); UI.toast('Priority added');
     });
   }
 

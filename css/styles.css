@@ -59,6 +59,14 @@
   --muted:var(--bone-faint);
   --muted-2:var(--bone-faint);
 
+  /* Genuine traffic-light tones, distinct from --green/--amber/--red
+     above (which are deliberately just gold/clay aliases everywhere
+     else in the app). Scoped to the funnel/pace dashboard only, where
+     an at-a-glance red/orange/green read is the whole point. */
+  --pace-green:#5fae7c;
+  --pace-amber:#dc9a45;
+  --pace-red:var(--clay-ink);
+
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -88,6 +96,10 @@
   --clay-dim:#8a4a2e;
   --clay-tint:rgba(192,111,74,.12);
   --clay-ink:#a24a2e;
+
+  --pace-green:#3f8f5e;
+  --pace-amber:#b97a2a;
+  --pace-red:var(--clay-ink);
 
   --shadow-resting:0 1px 2px rgba(20,25,40,.06);
   --shadow-floating:0 2px 6px rgba(20,25,40,.08), 0 16px 32px -8px rgba(20,25,40,.16);
@@ -248,6 +260,17 @@ svg{display:block}
 .bars .bar .col.over{background:var(--gold)}
 .bars .bar .n{font-family:var(--mono);font-size:11px;color:var(--bone-faint);margin-bottom:6px}
 .bars .bar .lbl{font-size:10.5px;color:var(--bone-faint);margin-top:8px}
+
+/* ---------- Sales funnel (tapering, traffic-light colored) ---------- */
+.funnel{display:flex;flex-direction:column;margin-top:10px}
+.funnel-row{display:flex;flex-direction:column;gap:5px}
+.funnel-bar-wrap{display:flex;justify-content:center}
+.funnel-bar{height:34px;border-radius:7px;display:flex;align-items:center;justify-content:center;transition:width .4s,background .3s;min-width:64px}
+.funnel-count{font-family:var(--mono);font-weight:600;font-size:14px;color:#fff;text-shadow:0 1px 1px rgba(0,0,0,.18)}
+.funnel-meta{display:flex;justify-content:space-between;font-size:12px;padding:0 2px}
+.funnel-label{font-weight:500;color:var(--bone-muted)}
+.funnel-pace{font-family:var(--mono);font-weight:600}
+.funnel-conv{text-align:center;font-size:11px;color:var(--bone-faint);font-family:var(--mono);padding:6px 0}
 
 /* ---------- Pipeline / list rows ---------- */
 .lrow{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--hairline-soft)}
