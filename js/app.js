@@ -59,7 +59,7 @@
   async function syncForSession() {
     const session = Auth.getSession();
     if (!session || S.lastUid() === session.id) return;
-    if (S.lastUid()) S.reset();
+    if (S.lastUid()) { S.reset(); UI.clearOnbDraft(); }
     S.setLastUid(session.id);
     try { await Sync.pull(); } catch (e) { console.warn('sync pull failed', e); }
   }
@@ -209,6 +209,7 @@
     await Auth.signOut();
     UI.authMode = 'login';
     UI.authError = '';
+    UI.clearOnbDraft();
     UI.render();
     UI.toast('Logged out');
   }

@@ -14,6 +14,30 @@
   let authInfo = '';           // neutral/positive notice, e.g. "check your email"
   const onbTmp = { role: null, vertical: null, name: '', coachName: 'Harry', coachCode: '', brand: '', coachCodeGen: '', goal: '', proof: '', steps: ['', '', ''] };
 
+  // onbTmp otherwise lives only in memory — close the tab mid-onboarding
+  // (phone locks, an accidental swipe-away, a background tab getting
+  // reclaimed) and everything typed so far — name, goal, proof, steps —
+  // is gone, with no account yet to have saved it to. Mirror it into
+  // localStorage as the user types/steps through, and restore it before
+  // the first render so onboarding resumes instead of restarting blank.
+  const ONB_DRAFT_KEY = 'elite_tracker_onb_draft_v1';
+  function saveOnbDraft() {
+    try { localStorage.setItem(ONB_DRAFT_KEY, JSON.stringify({ onbTmp, onbStep })); } catch (e) { /* ignore */ }
+  }
+  function loadOnbDraft() {
+    try {
+      const raw = localStorage.getItem(ONB_DRAFT_KEY);
+      if (!raw) return;
+      const draft = JSON.parse(raw);
+      if (draft && draft.onbTmp) Object.assign(onbTmp, draft.onbTmp);
+      if (draft && typeof draft.onbStep === 'number') onbStep = draft.onbStep;
+    } catch (e) { /* ignore corrupt draft */ }
+  }
+  function clearOnbDraft() {
+    try { localStorage.removeItem(ONB_DRAFT_KEY); } catch (e) { /* ignore */ }
+  }
+  loadOnbDraft();
+
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -60,6 +84,7 @@
       ${steps[onbStep]()}
       <div class="dots">${steps.map((_, i) => `<span class="d ${i === onbStep ? 'on' : ''}"></span>`).join('')}</div>
     </div>`;
+    saveOnbDraft();
   }
 
   function renderRoleScreen() {
@@ -137,11 +162,11 @@
       <p class="lead">So your coach sees who's putting in the work.</p>
       <div class="card-light">
         <div class="field"><label>Your name</label>
-          <input class="input" id="onb-name" placeholder="e.g. Jordan Avery" value="${esc(onbTmp.name)}"></div>
+          <input class="input" id="onb-name" placeholder="e.g. Jordan Avery" value="${esc(onbTmp.name)}" oninput="UI.captureOnb()"></div>
         <div class="field"><label>Your coach's name</label>
-          <input class="input" id="onb-coach" placeholder="e.g. Harry" value="${esc(onbTmp.coachName)}"></div>
+          <input class="input" id="onb-coach" placeholder="e.g. Harry" value="${esc(onbTmp.coachName)}" oninput="UI.captureOnb()"></div>
         <div class="field" style="margin-bottom:0"><label>Coach access code (optional)</label>
-          <input class="input" id="onb-code" placeholder="e.g. HARRY-4821" value="${esc(onbTmp.coachCode)}"></div>
+          <input class="input" id="onb-code" placeholder="e.g. HARRY-4821" value="${esc(onbTmp.coachCode)}" oninput="UI.captureOnb()"></div>
       </div>
       <div class="step-actions">
         <button class="btn ghost" data-act="onb-back">Back</button>
@@ -160,9 +185,9 @@
       <p class="lead">This is what your clients see on their nudges and reports.</p>
       <div class="card-light">
         <div class="field"><label>Your name</label>
-          <input class="input" id="onb-coachname" placeholder="e.g. Harry Whitfield" value="${esc(onbTmp.name)}"></div>
+          <input class="input" id="onb-coachname" placeholder="e.g. Harry Whitfield" value="${esc(onbTmp.name)}" oninput="UI.captureOnb()"></div>
         <div class="field" style="margin-bottom:0"><label>Business / brand name (optional)</label>
-          <input class="input" id="onb-brand" placeholder="e.g. Whitfield Coaching" value="${esc(onbTmp.brand)}"></div>
+          <input class="input" id="onb-brand" placeholder="e.g. Whitfield Coaching" value="${esc(onbTmp.brand)}" oninput="UI.captureOnb()"></div>
       </div>
       <div class="step-actions">
         <button class="btn ghost" data-act="onb-back">Back</button>
@@ -189,7 +214,7 @@
       <p class="lead">Start-up reflection. Where are you now, and what are you building toward?</p>
       <div class="card-light">
         <div class="field" style="margin-bottom:0"><label>Recent wins / where you're at</label>
-          <textarea class="textarea" id="onb-did" placeholder="What have you done well lately? What's your current level?">${esc(onbTmp.did || '')}</textarea></div>
+          <textarea class="textarea" id="onb-did" placeholder="What have you done well lately? What's your current level?" oninput="UI.captureOnb()">${esc(onbTmp.did || '')}</textarea></div>
       </div>
       <div class="step-actions">
         <button class="btn ghost" data-act="onb-back">Back</button>
@@ -202,13 +227,13 @@
       <p class="lead">Your operating framework: the Goal, the Proof it's working, and the Steps to get there.</p>
       <div class="card-light">
         <div class="field"><label>Goal — what are you chasing?</label>
-          <input class="input" id="onb-goal" placeholder="e.g. $500K income / #1 in office" value="${esc(onbTmp.goal)}"></div>
+          <input class="input" id="onb-goal" placeholder="e.g. $500K income / #1 in office" value="${esc(onbTmp.goal)}" oninput="UI.captureOnb()"></div>
         <div class="field"><label>Proof — how you'll know it's working</label>
-          <input class="input" id="onb-proof" placeholder="e.g. 4 listings a month, 80% BAP→list" value="${esc(onbTmp.proof)}"></div>
+          <input class="input" id="onb-proof" placeholder="e.g. 4 listings a month, 80% BAP→list" value="${esc(onbTmp.proof)}" oninput="UI.captureOnb()"></div>
         <div class="field" style="margin-bottom:0"><label>Steps — the daily behaviours</label>
-          <input class="input" style="margin-bottom:8px" id="onb-s0" placeholder="Step 1 — e.g. 20 calls before 11am" value="${esc(onbTmp.steps[0])}">
-          <input class="input" style="margin-bottom:8px" id="onb-s1" placeholder="Step 2 — e.g. 4 door knocks daily" value="${esc(onbTmp.steps[1])}">
-          <input class="input" id="onb-s2" placeholder="Step 3 — e.g. 1 appraisal booked" value="${esc(onbTmp.steps[2])}"></div>
+          <input class="input" style="margin-bottom:8px" id="onb-s0" placeholder="Step 1 — e.g. 20 calls before 11am" value="${esc(onbTmp.steps[0])}" oninput="UI.captureOnb()">
+          <input class="input" style="margin-bottom:8px" id="onb-s1" placeholder="Step 2 — e.g. 4 door knocks daily" value="${esc(onbTmp.steps[1])}" oninput="UI.captureOnb()">
+          <input class="input" id="onb-s2" placeholder="Step 3 — e.g. 1 appraisal booked" value="${esc(onbTmp.steps[2])}" oninput="UI.captureOnb()"></div>
       </div>
       <div class="step-actions">
         <button class="btn ghost" data-act="onb-back">Back</button>
@@ -219,6 +244,7 @@
   function captureOnb() {
     if (onbTmp.role === 'coach') {
       if (onbStep === 0) { onbTmp.name = ($('onb-coachname') || {}).value || ''; onbTmp.brand = ($('onb-brand') || {}).value || ''; }
+      saveOnbDraft();
       return;
     }
     if (onbStep === 1) {
@@ -232,6 +258,7 @@
       onbTmp.proof = ($('onb-proof') || {}).value || '';
       onbTmp.steps = [($('onb-s0') || {}).value || '', ($('onb-s1') || {}).value || '', ($('onb-s2') || {}).value || ''];
     }
+    saveOnbDraft();
   }
 
   function finishOnboarding() {
@@ -254,6 +281,7 @@
     }
     s.onboarded = true;
     S.save();
+    clearOnbDraft();
     $('onboarding').style.display = 'none';
     $('main').style.display = 'block';
     render();
@@ -756,6 +784,6 @@
     get trackPeriod() { return trackPeriod; }, set trackPeriod(v) { trackPeriod = v; },
     get reportType() { return reportType; }, set reportType(v) { reportType = v; },
     get onbTmp() { return onbTmp; },
-    captureOnb, finishOnboarding, initials, esc, money, ring,
+    captureOnb, finishOnboarding, clearOnbDraft, initials, esc, money, ring,
   };
 })(window);
