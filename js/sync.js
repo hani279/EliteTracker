@@ -298,5 +298,26 @@
 
   S.onSave(scheduleSync);
 
-  global.Sync = { push, pull };
+  /* ---------- roster refresh (coach only, every boot) ----------
+     pull() only ever runs once per signed-in session (see app.js's
+     syncForSession — it's gated on lastUid so it doesn't re-fetch an
+     agent's own data over top of unsynced local edits). A coach's
+     roster has no local edits to protect — it's entirely derived from
+     agents' own rows — so there's no offline-first reason to withhold
+     it from a plain refetch on every boot. Without this, an agent
+     linking after a coach's first login would never show up until the
+     coach wiped local data or logged in fresh on another device. */
+  async function refreshRoster() {
+    const c = client(); const session = global.Auth && Auth.getSession();
+    if (!c || !session) return;
+    const s = S.get();
+    if (s.mode !== 'coach') return;
+    try {
+      await pullRoster(c, session.id, s);
+      suppressNextPush = true;
+      S.save();
+    } catch (e) { console.warn('roster refresh failed', e); }
+  }
+
+  global.Sync = { push, pull, refreshRoster };
 })(window);

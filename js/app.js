@@ -58,10 +58,19 @@
      without double-pulling. */
   async function syncForSession() {
     const session = Auth.getSession();
-    if (!session || S.lastUid() === session.id) return;
-    if (S.lastUid()) { S.reset(); UI.clearOnbDraft(); }
-    S.setLastUid(session.id);
-    try { await Sync.pull(); } catch (e) { console.warn('sync pull failed', e); }
+    if (!session) return;
+    if (S.lastUid() !== session.id) {
+      if (S.lastUid()) { S.reset(); UI.clearOnbDraft(); }
+      S.setLastUid(session.id);
+      try { await Sync.pull(); } catch (e) { console.warn('sync pull failed', e); }
+      return;
+    }
+    // Same session as last boot — pull() above already covered a fresh
+    // login, but a coach's roster can change at any time from an agent's
+    // side (a new agent links, or an existing one hasn't been re-fetched
+    // in a while) with nothing local to signal that. Refresh it every
+    // boot; see Sync.refreshRoster for why this is safe to do eagerly.
+    await Sync.refreshRoster();
   }
 
   /* ---------- event delegation ---------- */
