@@ -369,5 +369,25 @@
     return data || [];
   }
 
-  global.Sync = { push, pull, refreshRoster, sendCoachMessage, fetchInbox, markMessageRead, fetchSentReports };
+  // Private notes — no agent-facing RLS policy exists on this table at
+  // all, unlike coach_messages, so this never reaches the agent's app.
+  async function fetchCoachNote(agentId) {
+    const c = client(); const session = global.Auth && Auth.getSession();
+    if (!c || !session) return '';
+    const { data, error } = await c.from('coach_notes').select('note').eq('coach_id', session.id).eq('agent_id', agentId).maybeSingle();
+    if (error) { console.warn('fetch coach note failed', error); return ''; }
+    return (data && data.note) || '';
+  }
+  async function saveCoachNote(agentId, note) {
+    const c = client(); const session = global.Auth && Auth.getSession();
+    if (!c || !session) return { error: 'Not connected — check your internet connection.' };
+    const { error } = await c.from('coach_notes').upsert(
+      { coach_id: session.id, agent_id: agentId, note, updated_at: new Date().toISOString() },
+      { onConflict: 'coach_id,agent_id' }
+    );
+    if (error) return { error: error.message };
+    return { ok: true };
+  }
+
+  global.Sync = { push, pull, refreshRoster, sendCoachMessage, fetchInbox, markMessageRead, fetchSentReports, fetchCoachNote, saveCoachNote };
 })(window);

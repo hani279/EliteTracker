@@ -646,7 +646,10 @@
       <div class="callout" style="margin-top:14px">${Icons.svg('target', { size: 15 })}<span>${coachClientTip(c)}</span></div>
       <div class="btn-row" style="margin-top:14px"><button class="btn outline" data-act="close-sheet">Close</button>
       <button class="btn gold" id="cc-msg">Send nudge</button></div>
-      <button class="btn outline" id="cc-report" style="margin-top:10px;width:100%">${Icons.svg('file', { size: 15 })} Send daily report</button>`);
+      <button class="btn outline" id="cc-report" style="margin-top:10px;width:100%">${Icons.svg('file', { size: 15 })} Send daily report</button>
+      <div class="field" style="margin-top:16px;margin-bottom:0"><label>Private notes — only you see this</label>
+        <textarea class="textarea" id="cc-note" placeholder="Loading…" style="min-height:80px"></textarea></div>
+      <button class="btn outline sm" id="cc-note-save" style="margin-top:8px">Save note</button>`);
     $('cc-msg').addEventListener('click', () => sendNudge(c));
     $('cc-report').addEventListener('click', () => dailyReportSheet(c));
     Sync.fetchSentReports(id).then((reports) => {
@@ -655,6 +658,17 @@
       el.textContent = reports.length
         ? new Date(reports[0].created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) + ' · ' + reports.length + ' total'
         : 'Never';
+    });
+    Sync.fetchCoachNote(id).then((note) => {
+      const el = $('cc-note'); // sheet may have closed already — guard
+      if (!el) return;
+      el.value = note; el.placeholder = 'e.g. Flagged low energy on last call — check in Thursday.';
+    });
+    $('cc-note-save').addEventListener('click', async () => {
+      const btn = $('cc-note-save'); btn.setAttribute('disabled', ''); btn.textContent = 'Saving…';
+      const r = await Sync.saveCoachNote(id, $('cc-note').value.trim());
+      btn.removeAttribute('disabled'); btn.textContent = 'Save note';
+      UI.toast(r.error ? 'Could not save — ' + r.error : 'Note saved');
     });
   }
   function buildDailyReportDraft(c) {
