@@ -8,6 +8,9 @@
 
   let current = 'today';       // agent view
   let coachView = 'dashboard'; // coach view
+  let clientSearch = '';
+  let clientStatusFilter = 'All';
+  let clientSort = 'pace-desc';
   let onbStep = 0;
   let authMode = 'signup';     // 'signup' | 'login'
   let authError = '';
@@ -514,6 +517,21 @@
   // ---- traffic-light pace color, used by the funnel below ----
   function paceColor(pct) { return pct >= 75 ? 'var(--pace-green)' : pct >= 45 ? 'var(--pace-amber)' : 'var(--pace-red)'; }
 
+  // Small 4-point trend line (oldest -> newest week), colored by the
+  // latest value so it reads at a glance alongside a status tag.
+  function sparkline(values, opt) {
+    opt = opt || {};
+    const w = opt.width || 64, h = opt.height || 20;
+    const vals = (values && values.length ? values : [0]);
+    const max = Math.max(...vals, 100);
+    const step = w / (vals.length - 1 || 1);
+    const points = vals.map((v, i) => `${Math.round(i * step)},${Math.round(h - (Math.max(0, v) / max) * h)}`).join(' ');
+    const color = paceColor(vals[vals.length - 1] || 0);
+    return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="display:block;flex:0 0 auto">
+      <polyline points="${points}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>`;
+  }
+
   function salesFunnelCard() {
     const agg = Intel.aggregate(Intel.rangeKeys('weekly'));
     const funnelKeys = Data.vertical().funnel;
@@ -741,12 +759,17 @@
         <div class="card" style="margin-top:0"><div class="section-title">At risk</div><div style="font-size:26px;font-family:var(--mono);font-weight:500;color:var(--clay)">${atRisk}</div></div>
         <div class="card" style="margin-top:0"><div class="section-title">Check-ins today</div><div style="font-size:26px;font-family:var(--mono);font-weight:500">${checkins}/${r.length}</div></div>
       </div>
+      <div class="btn-row" style="margin:14px 0">
+        <button class="btn outline" data-act="sent-reports">${Icons.svg('file', { size: 14 })} Sent reports</button>
+        <button class="btn gold" data-act="bulk-reports">${Icons.svg('bell', { size: 14 })} Send today's reports</button>
+      </div>
       <div class="card"><h3>Your clients <span class="pill">tap to drill in</span></h3>
         ${r.map((c) => {
           const tone = c.status === 'On track' ? 'green' : c.status === 'At risk' ? 'red' : 'amber';
           return `<div class="lrow" data-act="coach-client:${esc(c.id)}">
             <div class="mono">${initials(c.name)}</div>
             <div class="main"><div class="t">${esc(c.name)}</div><div class="s">${esc(c.type)} · ${esc(c.last)} · ${c.streak}d</div></div>
+            ${sparkline(c.paceTrend)}
             <div class="right"><span class="tag ${tone}">${esc(c.status)}</span><div class="subtle" style="font-size:11px;margin-top:3px">${c.pace}%</div></div>
           </div>`;
         }).join('')}
@@ -754,16 +777,37 @@
     </section>`;
   }
 
+  const CLIENT_SORTS = {
+    'pace-desc': { label: 'Pace (high→low)', fn: (a, b) => b.pace - a.pace },
+    'pace-asc': { label: 'Pace (low→high)', fn: (a, b) => a.pace - b.pace },
+    'streak-desc': { label: 'Streak (longest)', fn: (a, b) => b.streak - a.streak },
+    'name': { label: 'Name (A→Z)', fn: (a, b) => a.name.localeCompare(b.name) },
+  };
+  const CLIENT_STATUSES = ['All', 'On track', 'Watch', 'At risk'];
+
   function coachClients() {
     const s = S.get();
     if (!s.coachRoster.length) return coachEmptyState();
+    const q = clientSearch.trim().toLowerCase();
+    const filtered = s.coachRoster.filter((c) =>
+      (!q || c.name.toLowerCase().includes(q)) &&
+      (clientStatusFilter === 'All' || c.status === clientStatusFilter));
+    const list = [...filtered].sort((CLIENT_SORTS[clientSort] || CLIENT_SORTS['pace-desc']).fn);
     return `<section class="screen active">
-      <div class="card"><p class="subtle" style="margin:0">Full client roster — each consultant's own pace, streak and check-ins, pulled live from their data.</p></div>
-      ${s.coachRoster.map((c) => `<div class="card" style="display:flex;align-items:center;gap:12px" data-act="coach-client:${esc(c.id)}">
+      <div class="card">
+        <div class="field-icon" style="margin-bottom:10px">
+          ${Icons.svg('search', { size: 15 })}
+          <input class="input" id="client-search" placeholder="Search by name" value="${esc(clientSearch)}" oninput="App.clientSearch(this.value)">
+        </div>
+        <div class="tabs" style="margin-bottom:10px">${CLIENT_STATUSES.map((st) => `<button class="${clientStatusFilter === st ? 'on' : ''}" data-act="client-filter:${st}">${st}</button>`).join('')}</div>
+        <select class="input" id="client-sort" onchange="App.clientSort(this.value)">${Object.keys(CLIENT_SORTS).map((k) => `<option value="${k}" ${k === clientSort ? 'selected' : ''}>${CLIENT_SORTS[k].label}</option>`).join('')}</select>
+      </div>
+      ${list.map((c) => `<div class="card" style="display:flex;align-items:center;gap:12px" data-act="coach-client:${esc(c.id)}">
         <div class="avatar lg">${initials(c.name)}</div>
         <div style="flex:1"><div style="font-weight:600">${esc(c.name)}</div><div class="subtle">${esc(c.type)} · ${c.pace}% pace · ${c.streak}-day streak</div></div>
+        ${sparkline(c.paceTrend)}
         <span class="tag ${c.status === 'On track' ? 'green' : c.status === 'At risk' ? 'red' : 'amber'}">${esc(c.status)}</span>
-      </div>`).join('')}
+      </div>`).join('') || emptyState('No clients match.')}
     </section>`;
   }
 
@@ -818,8 +862,11 @@
     get pipeTab() { return pipeTab; }, set pipeTab(v) { pipeTab = v; },
     get pipeSearch() { return pipeSearch; }, set pipeSearch(v) { pipeSearch = v; },
     get trackPeriod() { return trackPeriod; }, set trackPeriod(v) { trackPeriod = v; },
+    get clientSearch() { return clientSearch; }, set clientSearch(v) { clientSearch = v; },
+    get clientStatusFilter() { return clientStatusFilter; }, set clientStatusFilter(v) { clientStatusFilter = v; },
+    get clientSort() { return clientSort; }, set clientSort(v) { clientSort = v; },
     get reportType() { return reportType; }, set reportType(v) { reportType = v; },
     get onbTmp() { return onbTmp; },
-    captureOnb, finishOnboarding, clearOnbDraft, initials, esc, money, ring,
+    captureOnb, finishOnboarding, clearOnbDraft, initials, esc, money, ring, sparkline,
   };
 })(window);

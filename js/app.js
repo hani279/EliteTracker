@@ -172,6 +172,9 @@
 
     // ---- coach ----
     if (cmd === 'coach-client') return coachClientSheet(a);
+    if (cmd === 'client-filter') { UI.clientStatusFilter = a; rerender(); return; }
+    if (cmd === 'sent-reports') return sentReportsSheet();
+    if (cmd === 'bulk-reports') return bulkReportsSheet();
 
     // ---- settings ----
     if (cmd === 'toggle-setting') return toggleSetting(a);
@@ -636,14 +639,23 @@
       <div class="kv"><span class="k">Type</span><span class="v">${UI.esc(c.type)}</span></div>
       <div class="kv"><span class="k">Status</span><span class="v">${UI.esc(c.status)}</span></div>
       <div class="kv"><span class="k">Week pace</span><span class="v">${c.pace}%</span></div>
+      <div class="kv"><span class="k">4-week trend</span><span class="v">${UI.sparkline(c.paceTrend, { width: 90, height: 26 })}</span></div>
       <div class="kv"><span class="k">Streak</span><span class="v">${c.streak} days</span></div>
       <div class="kv"><span class="k">Last check-in</span><span class="v">${UI.esc(c.last || '—')}</span></div>
+      <div class="kv"><span class="k">Last report sent</span><span class="v" id="cc-last-report">Loading…</span></div>
       <div class="callout" style="margin-top:14px">${Icons.svg('target', { size: 15 })}<span>${coachClientTip(c)}</span></div>
       <div class="btn-row" style="margin-top:14px"><button class="btn outline" data-act="close-sheet">Close</button>
       <button class="btn gold" id="cc-msg">Send nudge</button></div>
       <button class="btn outline" id="cc-report" style="margin-top:10px;width:100%">${Icons.svg('file', { size: 15 })} Send daily report</button>`);
     $('cc-msg').addEventListener('click', () => sendNudge(c));
     $('cc-report').addEventListener('click', () => dailyReportSheet(c));
+    Sync.fetchSentReports(id).then((reports) => {
+      const el = $('cc-last-report'); // sheet may have closed already — guard
+      if (!el) return;
+      el.textContent = reports.length
+        ? new Date(reports[0].created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) + ' · ' + reports.length + ' total'
+        : 'Never';
+    });
   }
   function buildDailyReportDraft(c) {
     return `Hi ${c.name.split(' ')[0]} — here's your daily rundown.\n\n`
@@ -685,6 +697,57 @@
     if (c.status === 'At risk') return `${c.name} is at ${c.pace}% and hasn't checked in recently. Call today — reset one keystone habit (the morning call block).`;
     if (c.status === 'Watch') return `${c.name} is slipping to ${c.pace}%. A short mid-week nudge usually pulls them back on pace.`;
     return `${c.name} is on track at ${c.pace}%. Reinforce the streak and stretch one metric 10%.`;
+  }
+
+  async function sentReportsSheet() {
+    UI.openSheet(`<h3>Sent reports</h3><p class="subtle">Loading…</p>`);
+    const s = S.get();
+    const reports = await Sync.fetchSentReports();
+    if (!reports.length) {
+      UI.openSheet(`<h3>Sent reports</h3><div class="empty">${Icons.svg('inbox', { size: 26 })}No reports sent yet.</div>
+        <button class="btn outline" data-act="close-sheet" style="margin-top:10px;width:100%">Close</button>`);
+      return;
+    }
+    const nameFor = (id) => (s.coachRoster.find((c) => c.id === id) || {}).name || 'Unknown';
+    UI.openSheet(`<h3>Sent reports</h3>
+      ${reports.map((r) => `<div class="card" style="margin:0 0 10px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
+          <div style="font-weight:600">${UI.esc(nameFor(r.agent_id))}</div>
+          <div class="subtle" style="font-size:11px">${new Date(r.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</div>
+        </div>
+        <p class="subtle" style="margin:0;white-space:pre-wrap;color:var(--bone)">${UI.esc(r.body)}</p>
+      </div>`).join('')}
+      <button class="btn outline" data-act="close-sheet" style="width:100%">Close</button>`);
+  }
+
+  function bulkReportsSheet() {
+    const s = S.get();
+    const targets = s.coachRoster.filter((c) => c.status === 'Watch' || c.status === 'At risk');
+    if (!targets.length) {
+      UI.openSheet(`<h3>Send today's reports</h3><div class="empty">${Icons.svg('check', { size: 26 })}Nobody needs a nudge today — everyone's on track.</div>
+        <button class="btn outline" data-act="close-sheet" style="margin-top:10px;width:100%">Close</button>`);
+      return;
+    }
+    UI.openSheet(`<h3>Send today's reports</h3>
+      <p class="subtle">Auto-drafted for everyone who's Watch or At risk. Edit before sending — send or skip each one individually.</p>
+      ${targets.map((c) => `<div class="card" style="margin:12px 0 0">
+        <div style="font-weight:600;margin-bottom:6px">${UI.esc(c.name)} <span class="tag ${c.status === 'At risk' ? 'red' : 'amber'}" style="margin-left:4px">${UI.esc(c.status)}</span></div>
+        <textarea class="textarea" id="br-body-${c.id}" style="min-height:110px">${UI.esc(buildDailyReportDraft(c))}</textarea>
+        <button class="btn gold sm" id="br-send-${c.id}" style="margin-top:8px">Send</button>
+      </div>`).join('')}
+      <button class="btn outline" data-act="close-sheet" style="width:100%;margin-top:16px">Done</button>`);
+    targets.forEach((c) => {
+      $(`br-send-${c.id}`).addEventListener('click', async () => {
+        const btn = $(`br-send-${c.id}`);
+        const body = $(`br-body-${c.id}`).value.trim();
+        if (!body) return;
+        btn.setAttribute('disabled', ''); btn.textContent = 'Sending…';
+        const r = await Sync.sendCoachMessage(c.id, 'Daily report', body);
+        if (r.error) { UI.toast('Could not send to ' + c.name); btn.removeAttribute('disabled'); btn.textContent = 'Send'; return; }
+        btn.textContent = 'Sent ✓'; btn.classList.remove('gold'); btn.classList.add('outline');
+        UI.toast('Sent to ' + c.name);
+      });
+    });
   }
 
   /* ---------- menu / settings ---------- */
@@ -880,6 +943,17 @@
     if (el) { el.focus(); if (pos != null) el.setSelectionRange(pos, pos); }
   }
 
+  function clientSearch(value) {
+    UI.clientSearch = value;
+    const active = document.activeElement;
+    const id = active && active.id;
+    const pos = active && active.selectionStart;
+    UI.render();
+    const el = id && $(id);
+    if (el) { el.focus(); if (pos != null) el.setSelectionRange(pos, pos); }
+  }
+  function clientSort(value) { UI.clientSort = value; rerender(); }
+
   // Live coach-code validation during onboarding — debounced so it doesn't
   // fire a lookup on every keystroke, and only re-renders (which would
   // otherwise steal focus mid-type) once the debounced result lands.
@@ -908,5 +982,5 @@
   }
 
   // expose a few for debugging
-  global.App = { rerender, scheduleReminders, pipeSearch, coachCodeInput };
+  global.App = { rerender, scheduleReminders, pipeSearch, coachCodeInput, clientSearch, clientSort };
 })(window);

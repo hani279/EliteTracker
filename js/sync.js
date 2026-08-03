@@ -220,19 +220,16 @@
     s.demoAlerts = buildAlerts(s.coachRoster);
   }
 
-  function rosterEntry(agent, dayMap) {
-    const Data = global.Data;
-    const vKey = agent.vertical === 'sales' ? 'sales' : 'realestate';
-    const defs = (Data && Data.VERTICALS[vKey].activity) || [];
-    const targets = agent.targets || {};
-    const today = S.todayKey();
+  // Pace for the 7-day window ending `weeksAgo` weeks back (weeksAgo=0 is
+  // this week) — same adaptive logic as intelligence.js's aggregate(),
+  // just parameterized so rosterEntry() can call it once per week for a
+  // trend instead of only ever computing "this week".
+  function weekPaceFor(dayMap, targets, defs, todayKey, weeksAgo) {
     const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
     const isWeekend = (k) => [0, 6].includes(S.parseKey(k).getDay());
-
-    // 7-day pace, same logic as intelligence.js's aggregate()
     let totalActual = 0, totalTarget = 0;
     for (let i = 6; i >= 0; i--) {
-      const k = S.addDays(today, -i);
+      const k = S.addDays(todayKey, -(weeksAgo * 7 + i));
       const rec = dayMap[k];
       const isPast = S.parseKey(k) <= startOfToday;
       const weekend = isWeekend(k);
@@ -243,7 +240,21 @@
         if (logged) totalActual += (rec.numbers[m.key] || 0);
       });
     }
-    const pace = totalTarget > 0 ? Math.round((totalActual / totalTarget) * 100) : 0;
+    return totalTarget > 0 ? Math.round((totalActual / totalTarget) * 100) : 0;
+  }
+
+  function rosterEntry(agent, dayMap) {
+    const Data = global.Data;
+    const vKey = agent.vertical === 'sales' ? 'sales' : 'realestate';
+    const defs = (Data && Data.VERTICALS[vKey].activity) || [];
+    const targets = agent.targets || {};
+    const today = S.todayKey();
+    const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
+    const isWeekend = (k) => [0, 6].includes(S.parseKey(k).getDay());
+
+    const pace = weekPaceFor(dayMap, targets, defs, today, 0);
+    // oldest -> newest, for the sparkline
+    const paceTrend = [3, 2, 1, 0].map((w) => weekPaceFor(dayMap, targets, defs, today, w));
 
     // consecutive logged workdays, walking back from today
     let streakCount = 0, k = today;
@@ -272,7 +283,7 @@
 
     return {
       id: agent.id, name: agent.name || 'Unnamed', type: vKey === 'sales' ? 'Sales' : 'Real Estate',
-      status, pace, streak: streakCount, last: fmtLastCheckin(lastKey, lastRow && lastRow.updated_at),
+      status, pace, paceTrend, streak: streakCount, last: fmtLastCheckin(lastKey, lastRow && lastRow.updated_at),
     };
   }
 
@@ -346,6 +357,17 @@
     const c = client(); if (!c) return;
     try { await c.from('coach_messages').update({ read: true }).eq('id', id); } catch (e) { /* best-effort */ }
   }
+  // Coach's own sent history — same table, opposite side of the RLS
+  // policy (coach_id = auth.uid() grants full access, not just insert).
+  async function fetchSentReports(agentId) {
+    const c = client(); const session = global.Auth && Auth.getSession();
+    if (!c || !session) return [];
+    let q = c.from('coach_messages').select('*').eq('coach_id', session.id).order('created_at', { ascending: false });
+    if (agentId) q = q.eq('agent_id', agentId);
+    const { data, error } = await q;
+    if (error) { console.warn('fetch sent reports failed', error); return []; }
+    return data || [];
+  }
 
-  global.Sync = { push, pull, refreshRoster, sendCoachMessage, fetchInbox, markMessageRead };
+  global.Sync = { push, pull, refreshRoster, sendCoachMessage, fetchInbox, markMessageRead, fetchSentReports };
 })(window);
