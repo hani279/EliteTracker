@@ -781,6 +781,7 @@
       <button class="choice icon-row" data-act="export-ics">${Icons.svg('calendar', { size: 17 })}<span>Add daily reminder to calendar</span></button>
       <button class="choice icon-row" data-act="backup-export">${Icons.svg('upload', { size: 17 })}<span>Export backup</span></button>
       <button class="choice icon-row" data-act="backup-import">${Icons.svg('download', { size: 17 })}<span>Restore backup</span></button>
+      <a class="choice icon-row" href="privacy.html" target="_blank" rel="noopener">${Icons.svg('file', { size: 17 })}<span>Privacy policy</span></a>
       <button class="choice icon-row" data-act="log-out">${Icons.svg('logout', { size: 17 })}<span>Log out</span></button>
       <button class="choice icon-row" data-act="reset-app" style="color:var(--clay)">${Icons.svg('reset', { size: 17 })}<span>Reset all data</span></button>`);
     $('m-theme').addEventListener('click', () => { toggleTheme(); openMenu(); });
