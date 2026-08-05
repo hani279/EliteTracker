@@ -341,6 +341,13 @@
   /* ============================================================
      MAIN RENDER / ROUTER
      ============================================================ */
+  // Only jump to the top of the page when the visible screen actually
+  // changes (a tab switch). render() itself gets called on every small
+  // data mutation too (tapping a number stepper, ticking off a focus
+  // item) — unconditionally scrolling to top on those made the page
+  // snap out from under your thumb mid-tap, which read as a rubber-band
+  // bounce even though it wasn't a real overscroll.
+  let lastRenderedView = null;
   function render() {
     const s = S.get();
     if (!Auth.getSession() || !s.onboarded) { $('onboarding').style.display = 'block'; $('main').style.display = 'none'; renderOnboarding(); return; }
@@ -349,7 +356,9 @@
     const host = $('views');
     if (s.mode === 'coach') host.innerHTML = coachScreen();
     else host.innerHTML = agentScreen();
-    window.scrollTo({ top: 0 });
+    const viewKey = s.mode + ':' + (s.mode === 'coach' ? coachView : current);
+    if (viewKey !== lastRenderedView) window.scrollTo({ top: 0 });
+    lastRenderedView = viewKey;
   }
 
   function agentScreen() {
@@ -378,7 +387,6 @@
   function viewToday() {
     const s = S.get(); const day = S.dayRecord(S.todayKey());
     const calls = Intel.callsToday(); const pace = Intel.todayPace(); const st = Intel.streak();
-    const defs = Data.activityDefs();
     const doneFocus = day.focus.filter((f) => f.done).length;
     const pred = Intel.predictive();
 
@@ -413,16 +421,6 @@
       </div>
 
       ${salesFunnelCard()}
-
-      <div class="card">
-        <h3>Log today's numbers <span class="pill">${Data.vertical().label}</span></h3>
-        ${defs.map((m) => numberRow(m, day)).join('')}
-        <div class="hr"></div>
-        <div class="section-title">Outcomes (tap to add)</div>
-        <div style="display:flex;flex-wrap:wrap;gap:8px">
-          ${Data.outcomeDefs().map((o) => `<button class="tag ${o.bad ? 'red' : 'gold'}" data-act="outcome:${o.key}">${esc(o.label)} · ${(day.outcomes[o.key] || 0)}</button>`).join('')}
-        </div>
-      </div>
 
       <div class="card dark">
         <div class="coach-msg">
@@ -507,6 +505,16 @@
     </svg>`;
   }
 
+  // Symmetric trapezoid clip-path for one funnel segment, given its own
+  // top/bottom width as a % of the shape column — top width matches the
+  // previous segment's bottom width so adjacent segments share an edge
+  // and read as one continuous tapering silhouette, not stacked bars.
+  function funnelClip(topPct, bottomPct) {
+    const tl = (100 - topPct) / 2, tr = 100 - tl;
+    const bl = (100 - bottomPct) / 2, br = 100 - bl;
+    return `polygon(${tl}% 0%, ${tr}% 0%, ${br}% 100%, ${bl}% 100%)`;
+  }
+
   function salesFunnelCard() {
     const agg = Intel.aggregate(Intel.rangeKeys('weekly'));
     const funnelKeys = Data.vertical().funnel;
@@ -515,21 +523,27 @@
       return { key, label: m.label, actual: m.actual, target: m.target, pace: Intel.metricPace(m) };
     });
     const maxActual = Math.max(...stages.map((s) => s.actual), 1);
+    const widths = stages.map((s) => Math.max(10, Math.round((s.actual / maxActual) * 100)));
     const tips = Intel.suggestions(agg);
     const topTip = tips.find((t) => t.tone === 'warn') || tips[0];
 
     return `<div class="card">
       <h3>Activity Funnel <span class="pill">This week</span></h3>
-      <div class="funnel">
-        ${stages.map((s, i) => {
-          const widthPct = Math.max(22, Math.round((s.actual / maxActual) * 100));
-          const color = paceColor(s.pace);
-          const conv = i > 0 && stages[i - 1].actual > 0 ? `<div class="funnel-conv">↓ ${Math.round((s.actual / stages[i - 1].actual) * 100)}%</div>` : '';
-          return `${conv}<div class="funnel-row">
-            <div class="funnel-bar-wrap"><div class="funnel-bar" style="width:${widthPct}%;background:${color}"><span class="funnel-count">${s.actual}</span></div></div>
-            <div class="funnel-meta"><span class="funnel-label">${esc(s.label)}</span><span class="funnel-pace" style="color:${color}">${s.pace}%</span></div>
-          </div>`;
-        }).join('')}
+      <div class="funnel2">
+        <div class="funnel2-shape">
+          ${stages.map((s, i) => {
+            const top = widths[i], bottom = i < stages.length - 1 ? widths[i + 1] : widths[i];
+            return `<div class="funnel2-seg" style="background:${paceColor(s.pace)};clip-path:${funnelClip(top, bottom)}"></div>`;
+          }).join('')}
+        </div>
+        <div class="funnel2-legend">
+          ${stages.map((s) => `<div class="funnel2-row">
+            <span class="funnel2-dot" style="background:${paceColor(s.pace)}"></span>
+            <span class="funnel2-label">${esc(s.label)}</span>
+            <span class="funnel2-count">${s.actual}</span>
+            <span class="funnel2-pace" style="color:${paceColor(s.pace)}">${s.pace}%</span>
+          </div>`).join('')}
+        </div>
       </div>
       ${topTip ? `<div class="callout ${topTip.tone === 'good' ? 'green' : ''}" style="margin-top:14px">${Icons.svg(topTip.tone === 'good' ? 'check' : 'target', { size: 15 })}<span>${esc(topTip.text)}</span></div>` : ''}
     </div>`;
@@ -543,8 +557,19 @@
     const agg = Intel.aggregate(Intel.rangeKeys(trackPeriod));
     const defs = Data.activityDefs(); const outs = Data.outcomeDefs();
     const conv = Intel.conversions(agg);
+    const day = S.dayRecord(S.todayKey());
     const tabs = [['daily', 'Daily'], ['weekly', 'Weekly'], ['month', 'Monthly']];
     return `<section class="screen active">
+      <div class="card">
+        <h3>Log today's numbers <span class="pill">${Data.vertical().label}</span></h3>
+        ${defs.map((m) => numberRow(m, day)).join('')}
+        <div class="hr"></div>
+        <div class="section-title">Outcomes (tap to add)</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          ${Data.outcomeDefs().map((o) => `<button class="tag ${o.bad ? 'red' : 'gold'}" data-act="outcome:${o.key}">${esc(o.label)} · ${(day.outcomes[o.key] || 0)}</button>`).join('')}
+        </div>
+      </div>
+
       <div class="tabs">${tabs.map(([k, l]) => `<button class="${trackPeriod === k ? 'on' : ''}" data-act="track-period:${k}">${l}</button>`).join('')}</div>
       <div class="card" style="display:flex;align-items:center;gap:14px">
         ${ring(agg.pace, 'PACE', { light: true, color: agg.pace >= 85 ? 'var(--green)' : 'var(--gold)' })}

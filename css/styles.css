@@ -261,16 +261,19 @@ svg{display:block}
 .bars .bar .n{font-family:var(--mono);font-size:11px;color:var(--bone-faint);margin-bottom:6px}
 .bars .bar .lbl{font-size:10.5px;color:var(--bone-faint);margin-top:8px}
 
-/* ---------- Sales funnel (tapering, traffic-light colored) ---------- */
-.funnel{display:flex;flex-direction:column;margin-top:10px}
-.funnel-row{display:flex;flex-direction:column;gap:5px}
-.funnel-bar-wrap{display:flex;justify-content:center}
-.funnel-bar{height:34px;border-radius:7px;display:flex;align-items:center;justify-content:center;transition:width .4s,background .3s;min-width:64px}
-.funnel-count{font-family:var(--mono);font-weight:600;font-size:14px;color:#fff;text-shadow:0 1px 1px rgba(0,0,0,.18)}
-.funnel-meta{display:flex;justify-content:space-between;font-size:12px;padding:0 2px}
-.funnel-label{font-weight:500;color:var(--bone-muted)}
-.funnel-pace{font-family:var(--mono);font-weight:600}
-.funnel-conv{text-align:center;font-size:11px;color:var(--bone-faint);font-family:var(--mono);padding:6px 0}
+/* ---------- Sales funnel — a continuous tapering silhouette (shape
+   column, clip-path trapezoids sharing edges between stages) paired
+   with a legend column, traffic-light colored by pace ---------- */
+.funnel2{display:flex;gap:16px;margin-top:14px}
+.funnel2-shape{flex:0 0 34%;display:flex;flex-direction:column}
+.funnel2-seg{height:44px;transition:clip-path .4s,background .3s}
+.funnel2-legend{flex:1;min-width:0;display:flex;flex-direction:column}
+.funnel2-row{height:44px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--hairline-soft)}
+.funnel2-row:last-child{border-bottom:none}
+.funnel2-dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+.funnel2-label{font-weight:500;color:var(--bone-muted);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+.funnel2-count{font-family:var(--mono);font-size:13px;color:var(--bone-faint)}
+.funnel2-pace{font-family:var(--mono);font-weight:600;font-size:12px;min-width:36px;text-align:right}
 
 /* ---------- Pipeline / list rows ---------- */
 .lrow{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--hairline-soft)}
