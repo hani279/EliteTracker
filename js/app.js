@@ -156,8 +156,6 @@
     if (cmd === 'add-crm') return crmSheet(null);
     if (cmd === 'edit-crm') return crmSheet(a);
     if (cmd === 'crm-done') { e.stopPropagation(); return crmDone(a); }
-    if (cmd === 'backup-export') return exportBackup();
-    if (cmd === 'backup-import') return importBackup();
 
     // ---- reports ----
     if (cmd === 'report-type') { UI.reportType = a; rerender(); return; }
@@ -183,7 +181,6 @@
     if (cmd === 'export-ics') return exportICS();
     if (cmd === 'focus-to-calendar') return exportFocusICS();
     if (cmd === 'install-app') return doInstall();
-    if (cmd === 'switch-vertical') return switchVertical();
     if (cmd === 'reset-app') return resetApp();
   }
 
@@ -545,26 +542,6 @@
     });
   }
 
-  /* ---------- backup ---------- */
-  function exportBackup() {
-    const data = JSON.stringify(S.get(), null, 2);
-    const blob = new Blob([data], { type: 'application/json' });
-    downloadBlob(blob, `elite-tracker-backup-${S.todayKey()}.json`);
-    UI.toast('Backup exported');
-  }
-  function importBackup() {
-    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'application/json';
-    inp.onchange = () => {
-      const file = inp.files[0]; if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        try { const obj = JSON.parse(reader.result); S.replace(obj); UI.render(); UI.toast('Backup restored'); }
-        catch (e) { UI.toast('Invalid backup file'); }
-      };
-      reader.readAsText(file);
-    };
-    inp.click();
-  }
   function downloadBlob(blob, name) {
     const url = URL.createObjectURL(blob); const a = document.createElement('a');
     a.href = url; a.download = name; document.body.appendChild(a); a.click();
@@ -765,25 +742,36 @@
   }
 
   /* ---------- menu / settings ---------- */
+  function tile(opt) {
+    const tag = opt.href ? 'a' : 'button';
+    const isStatic = !opt.href && !opt.act && !opt.id;
+    const attrs = opt.href ? `href="${opt.href}" target="_blank" rel="noopener"` : (opt.act ? `data-act="${opt.act}"` : '');
+    return `<${tag} class="tile${isStatic ? ' static' : ''}" id="${opt.id || ''}" ${attrs} ${opt.color ? `style="color:${opt.color}"` : ''}>
+      ${Icons.svg(opt.icon, { size: 20 })}
+      <span class="tl">${opt.label}</span>
+      ${opt.sub ? `<span class="ts2">${opt.sub}</span>` : ''}
+    </${tag}>`;
+  }
   function openMenu() {
     const s = S.get();
     const session = Auth.getSession();
     UI.openSheet(`<h3>Menu</h3>
       ${session ? `<p class="subtle" style="margin:-8px 0 16px">Signed in as ${UI.esc(session.email)}${session.provider === 'google' ? ' · Google' : ''}</p>` : ''}
-      <button class="choice icon-row" id="m-theme">${Icons.svg(s.settings.theme === 'light' ? 'sun' : 'moon', { size: 17 })}<span>Appearance — ${s.settings.theme === 'light' ? 'Light' : 'Dark'}</span></button>
-      ${s.mode === 'coach' ? `<button class="choice icon-row" style="cursor:default"><span style="display:flex;align-items:center;color:var(--gold-ink)">${Icons.svg('target', { size: 17 })}</span><span>Your coach code — ${UI.esc(s.profile.coachCode || '—')}</span></button>` : ''}
-      ${s.mode === 'agent' ? `<button class="choice icon-row" data-act="nav:goals">${Icons.svg('flag', { size: 17 })}<span>Goals & build framework</span></button>` : ''}
-      ${s.mode === 'agent' ? `<button class="choice icon-row" id="m-inbox">${Icons.svg('inbox', { size: 17 })}<span>Messages from your coach</span></button>` : ''}
-      <button class="choice icon-row" id="m-reminders">${Icons.svg('bell', { size: 17 })}<span>Reminders — ${s.settings.remindersEnabled ? 'On' : 'Off'} (${s.settings.reminderTime} / ${s.settings.eodTime})</span></button>
-      ${s.mode === 'agent' ? `<button class="choice icon-row" data-act="switch-vertical">${Icons.svg('swap', { size: 17 })}<span>Switch version — currently ${Data.vertical().label}</span></button>` : ''}
-      ${s.mode === 'agent' ? `<button class="choice icon-row" id="m-coachcode">${Icons.svg('target', { size: 17 })}<span>${s.profile.coachId ? 'Coach — ' + UI.esc(s.profile.coachName) : "Link your coach's code"}</span></button>` : ''}
-      <button class="choice icon-row" data-act="install-app">${Icons.svg('download', { size: 17 })}<span>Install app on this phone</span></button>
-      <button class="choice icon-row" data-act="export-ics">${Icons.svg('calendar', { size: 17 })}<span>Add daily reminder to calendar</span></button>
-      <button class="choice icon-row" data-act="backup-export">${Icons.svg('upload', { size: 17 })}<span>Export backup</span></button>
-      <button class="choice icon-row" data-act="backup-import">${Icons.svg('download', { size: 17 })}<span>Restore backup</span></button>
-      <a class="choice icon-row" href="privacy.html" target="_blank" rel="noopener">${Icons.svg('file', { size: 17 })}<span>Privacy policy</span></a>
-      <button class="choice icon-row" data-act="log-out">${Icons.svg('logout', { size: 17 })}<span>Log out</span></button>
-      <button class="choice icon-row" data-act="reset-app" style="color:var(--clay)">${Icons.svg('reset', { size: 17 })}<span>Reset all data</span></button>`);
+      <div class="tile-grid">
+        ${tile({ id: 'm-theme', icon: s.settings.theme === 'light' ? 'sun' : 'moon', label: 'Appearance', sub: s.settings.theme === 'light' ? 'Light' : 'Dark' })}
+        ${s.mode === 'agent' ? tile({ act: 'nav:goals', icon: 'flag', label: 'Goals' }) : ''}
+        ${s.mode === 'agent' ? tile({ id: 'm-inbox', icon: 'inbox', label: 'Messages' }) : ''}
+        ${tile({ id: 'm-reminders', icon: 'bell', label: 'Reminders', sub: s.settings.remindersEnabled ? 'On' : 'Off' })}
+        ${s.mode === 'agent' ? tile({ id: 'm-coachcode', icon: 'target', label: 'Coach', sub: s.profile.coachId ? UI.esc(s.profile.coachName) : 'Not linked' }) : ''}
+        ${s.mode === 'coach' ? tile({ icon: 'target', label: 'Coach code', sub: UI.esc(s.profile.coachCode || '—') }) : ''}
+        ${tile({ act: 'install-app', icon: 'download', label: 'Install app' })}
+        ${tile({ act: 'export-ics', icon: 'calendar', label: 'Calendar' })}
+        ${tile({ href: 'privacy.html', icon: 'file', label: 'Privacy' })}
+      </div>
+      <div class="tile-grid" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--hairline-soft)">
+        ${tile({ act: 'log-out', icon: 'logout', label: 'Log out' })}
+        ${tile({ act: 'reset-app', icon: 'reset', label: 'Reset data', color: 'var(--clay)' })}
+      </div>`);
     $('m-theme').addEventListener('click', () => { toggleTheme(); openMenu(); });
     $('m-reminders').addEventListener('click', remindersSheet);
     if ($('m-coachcode')) $('m-coachcode').addEventListener('click', linkCoachSheet);
@@ -853,23 +841,9 @@
       scheduleReminders(); UI.closeSheet(); UI.toast('Reminders enabled');
     });
   }
-  function switchVertical() {
-    const s = S.get();
-    const next = s.profile.vertical === 'realestate' ? 'sales' : 'realestate';
-    UI.openSheet(`<h3>Switch version</h3>
-      <p class="subtle">Switch to <b>${Data.VERTICALS[next].label}</b>? Your metrics, pipeline stages and reports adapt. Existing data is kept.</p>
-      <div class="btn-row" style="margin-top:14px"><button class="btn outline" data-act="close-sheet">Cancel</button>
-      <button class="btn gold" id="sv-go">Switch to ${Data.VERTICALS[next].label}</button></div>`);
-    $('sv-go').addEventListener('click', () => {
-      s.profile.vertical = next; s.profile.role = Data.VERTICALS[next].roleLabel;
-      Data.seedTargets();
-      s.focusTemplate = Data.DEFAULT_FOCUS[next].map((x) => ({ ...x }));
-      S.save(); UI.closeSheet(); UI.current = 'today'; UI.render(); UI.toast('Switched to ' + Data.VERTICALS[next].label);
-    });
-  }
   function resetApp() {
     UI.openSheet(`<h3 style="color:var(--clay)">Reset all data?</h3>
-      <p class="subtle">This clears everything on this device and restarts onboarding. Export a backup first if unsure.</p>
+      <p class="subtle">This clears everything on this device and restarts onboarding.</p>
       <div class="btn-row" style="margin-top:14px"><button class="btn outline" data-act="close-sheet">Cancel</button>
       <button class="btn danger" id="rs-go">Reset everything</button></div>`);
     // Clearing lastUid alongside the local state forces syncForSession() to

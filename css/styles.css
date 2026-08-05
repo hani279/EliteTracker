@@ -340,6 +340,21 @@ svg{display:block}
 .choice.icon-row{display:flex;align-items:center;gap:13px;font-size:14.5px;font-weight:500;color:var(--bone);text-decoration:none;cursor:pointer}
 .choice.icon-row svg{flex:0 0 auto;color:var(--gold-ink)}
 
+/* ---------- Menu tile grid (square, compact — replaces long lists of
+   full-width rows for the settings/menu sheet) ---------- */
+.tile-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:10px}
+.tile{
+  aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+  background:var(--glass-1);-webkit-backdrop-filter:var(--glass-blur-sm);backdrop-filter:var(--glass-blur-sm);
+  border:1.5px solid var(--hairline);border-radius:var(--radius-lg);padding:10px 6px;
+  text-align:center;text-decoration:none;cursor:pointer;transition:.15s;box-shadow:var(--glass-sheen)
+}
+.tile:active{background:var(--surface-2)}
+.tile.static{cursor:default}
+.tile svg{color:var(--gold-ink)}
+.tile .tl{font-size:12.5px;font-weight:500;color:var(--bone);line-height:1.25}
+.tile .ts2{font-size:10.5px;color:var(--bone-faint);line-height:1.2}
+
 /* ---------- Onboarding ---------- */
 .onb{min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding:44px 24px calc(44px + var(--safe-bottom));background:transparent;color:var(--bone)}
 .onb .brand{display:flex;align-items:center;gap:9px;justify-content:center;margin-bottom:10px}
