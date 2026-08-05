@@ -150,6 +150,7 @@ svg{display:block}
 #app{max-width:520px;margin:0 auto;min-height:100vh;position:relative;background:transparent}
 .screen{display:none;padding:calc(var(--safe-top) + 6px) 18px 128px}
 .screen.active{display:block;animation:fade .25s ease}
+.screen.active.no-anim{animation:none}
 @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
 /* ---------- Top bar (frosted glass — content scrolls beneath it) ---------- */

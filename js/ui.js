@@ -357,7 +357,18 @@
     if (s.mode === 'coach') host.innerHTML = coachScreen();
     else host.innerHTML = agentScreen();
     const viewKey = s.mode + ':' + (s.mode === 'coach' ? coachView : current);
-    if (viewKey !== lastRenderedView) window.scrollTo({ top: 0 });
+    if (viewKey !== lastRenderedView) {
+      window.scrollTo({ top: 0 });
+    } else {
+      // Same screen as last render — this is a data-only update (a
+      // stepper tap, a checkbox toggle), not a navigation. The fresh
+      // .screen element still gets its entrance animation by default,
+      // which replayed on every tap and read as the page reloading.
+      // Suppressing it here (before the browser's next paint) keeps it
+      // for genuine tab switches only.
+      const screenEl = host.querySelector('.screen');
+      if (screenEl) screenEl.classList.add('no-anim');
+    }
     lastRenderedView = viewKey;
   }
 
