@@ -15,7 +15,7 @@
   let authMode = 'signup';     // 'signup' | 'login'
   let authError = '';
   let authInfo = '';           // neutral/positive notice, e.g. "check your email"
-  const onbTmp = { role: null, vertical: null, name: '', coachName: '', coachId: '', coachLookupStatus: '', coachCode: '', brand: '', coachCodeGen: '', goal: '', proof: '', steps: ['', '', ''] };
+  const onbTmp = { role: null, vertical: null, name: '', coachName: '', coachId: '', coachLookupStatus: '', coachCode: '', brand: '', coachCodeGen: '' };
 
   // onbTmp otherwise lives only in memory — close the tab mid-onboarding
   // (phone locks, an accidental swipe-away, a background tab getting
@@ -81,7 +81,7 @@
     const wrap = $('onboarding');
     if (!Auth.getSession()) { wrap.innerHTML = renderAuthScreen(); return; }
     if (!onbTmp.role) { wrap.innerHTML = renderRoleScreen(); return; }
-    const steps = onbTmp.role === 'coach' ? [stepCoachProfile, stepCoachCode] : [stepVertical, stepProfile, stepBuild, stepGoal];
+    const steps = onbTmp.role === 'coach' ? [stepCoachProfile, stepCoachCode] : [stepVertical, stepProfile, stepBuild];
     wrap.innerHTML = `<div class="onb">
       <div class="brand"><span class="dia"></span><span class="nm">ELITE</span><span class="tk">TRACKER</span></div>
       ${steps[onbStep]()}
@@ -233,25 +233,6 @@
       </div>
       <div class="step-actions">
         <button class="btn ghost" data-act="onb-back">Back</button>
-        <button class="btn gold" data-act="onb-next">Continue</button>
-      </div>`;
-  }
-
-  function stepGoal() {
-    return `<h2>Build the best consultant</h2>
-      <p class="lead">Your operating framework: the Goal, the Proof it's working, and the Steps to get there.</p>
-      <div class="card-light">
-        <div class="field"><label>Goal — what are you chasing?</label>
-          <input class="input" id="onb-goal" placeholder="e.g. $500K income / #1 in office" value="${esc(onbTmp.goal)}" oninput="UI.captureOnb()"></div>
-        <div class="field"><label>Proof — how you'll know it's working</label>
-          <input class="input" id="onb-proof" placeholder="e.g. 4 listings a month, 80% BAP→list" value="${esc(onbTmp.proof)}" oninput="UI.captureOnb()"></div>
-        <div class="field" style="margin-bottom:0"><label>Steps — the daily behaviours</label>
-          <input class="input" style="margin-bottom:8px" id="onb-s0" placeholder="Step 1 — e.g. 20 calls before 11am" value="${esc(onbTmp.steps[0])}" oninput="UI.captureOnb()">
-          <input class="input" style="margin-bottom:8px" id="onb-s1" placeholder="Step 2 — e.g. 4 door knocks daily" value="${esc(onbTmp.steps[1])}" oninput="UI.captureOnb()">
-          <input class="input" id="onb-s2" placeholder="Step 3 — e.g. 1 appraisal booked" value="${esc(onbTmp.steps[2])}" oninput="UI.captureOnb()"></div>
-      </div>
-      <div class="step-actions">
-        <button class="btn ghost" data-act="onb-back">Back</button>
         <button class="btn gold" data-act="onb-finish">Enter ELITE Tracker</button>
       </div>`;
   }
@@ -267,11 +248,6 @@
       onbTmp.coachCode = ($('onb-code') || {}).value || '';
     }
     if (onbStep === 2) { onbTmp.did = ($('onb-did') || {}).value || ''; }
-    if (onbStep === 3) {
-      onbTmp.goal = ($('onb-goal') || {}).value || '';
-      onbTmp.proof = ($('onb-proof') || {}).value || '';
-      onbTmp.steps = [($('onb-s0') || {}).value || '', ($('onb-s1') || {}).value || '', ($('onb-s2') || {}).value || ''];
-    }
     saveOnbDraft();
   }
 
@@ -289,7 +265,6 @@
       s.profile.name = onbTmp.name || 'Consultant';
       s.profile.coachName = onbTmp.coachName || 'your coach';
       s.profile.coachCode = onbTmp.coachCode || '';
-      s.buildFramework = { goal: onbTmp.goal, proof: onbTmp.proof, steps: onbTmp.steps.filter(Boolean) };
       if (onbTmp.did) { const t = S.dayRecord(S.todayKey()); t.summary.did = onbTmp.did; }
       Data.seedAll(onbTmp.vertical);
     }
