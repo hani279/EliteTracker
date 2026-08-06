@@ -6,10 +6,10 @@
    library directly, so swapping backends only ever touches this
    one file plus whichever module owns that slice of data.
 
-   TODO(launch): replace the two placeholders below with your real
-   project values — Supabase dashboard > Project Settings > API.
-   The anon key is safe to ship in client code; it only grants what
-   the Row Level Security policies in supabase/migrations/0001_init.sql
+   SUPABASE_URL / SUPABASE_ANON_KEY below point at the live project
+   (Supabase dashboard > Project Settings > API if these ever need to
+   change). The anon key is safe to ship in client code; it only grants
+   what the Row Level Security policies in supabase/migrations/*.sql
    allow. Never put the service_role key here or anywhere client-side.
    ============================================================ */
 (function (global) {
@@ -22,7 +22,7 @@
   // client-side (it identifies the sender, it doesn't authorize anything).
   // Its private counterpart lives only in the send-nudge Edge Function's
   // secrets. See BACKEND_SETUP.md for how this pair was generated.
-  const VAPID_PUBLIC_KEY = 'BNAZgRFt9BY_HGEcpCGfwIUhp85lY7gboO7fgXcmvGPNw9zmnf5vWg1j0xZss-bcwvF8ZRupP4wlqv0ok0KaR8k';
+  const VAPID_PUBLIC_KEY = 'BFO4wytIla3ZG_lo8xkgdkAblw9KEYP26nHiPDpWgvSTEPOcJWOLPZMvPfyGSIthsstO9wav-pjKFFqaiPzTMTo';
 
   function isConfigured() {
     return SUPABASE_URL.indexOf('YOUR_SUPABASE') !== 0 && SUPABASE_ANON_KEY.indexOf('YOUR_SUPABASE') !== 0;
