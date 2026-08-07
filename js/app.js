@@ -249,11 +249,13 @@
         <button data-act="outnum:${key}:+">${Icons.svg('plus', { size: 14 })}</button>
       </div>
       <button class="btn gold" data-act="close-sheet">Done</button>`);
-    // local handlers for outnum
+    // local handlers for outnum — also rerender the screen behind the sheet
+    // (not just the sheet's own counter), otherwise the outcome tag's count
+    // stays stale until some unrelated action happens to trigger a render.
     $('sheet').querySelectorAll('[data-act^="outnum:"]').forEach((btn) => btn.addEventListener('click', () => {
       const [, k, sign] = btn.getAttribute('data-act').split(':');
       d.outcomes[k] = Math.max(0, (d.outcomes[k] || 0) + (sign === '+' ? 1 : -1));
-      $('out-val').textContent = d.outcomes[k]; S.save();
+      $('out-val').textContent = d.outcomes[k]; rerender();
     }));
   }
 
