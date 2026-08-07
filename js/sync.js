@@ -75,7 +75,8 @@
 
     if ((s.pipeline || []).length) {
       await c.from('pipeline_items').upsert(s.pipeline.map((p) => ({
-        id: p.id, profile_id: pid, name: p.name, detail: p.detail || '', stage: p.stage,
+        id: p.id, profile_id: pid, name: p.name, business_name: p.businessName || '',
+        phone: p.phone || '', email: p.email || '', detail: p.detail || '', stage: p.stage,
         value: p.value || 0, selling_month: p.sellingMonth || '', stalled: !!p.stalled,
       })));
     }
@@ -172,7 +173,8 @@
 
     const { data: pipeline } = await c.from('pipeline_items').select('*').eq('profile_id', pid);
     if (pipeline && pipeline.length) s.pipeline = pipeline.map((p) => ({
-      id: p.id, name: p.name, detail: p.detail, stage: p.stage, value: p.value,
+      id: p.id, name: p.name, businessName: p.business_name || '', phone: p.phone || '', email: p.email || '',
+      detail: p.detail, stage: p.stage, value: p.value,
       sellingMonth: p.selling_month, stalled: p.stalled, updated: Date.parse(p.updated_at) || Date.now(),
     }));
 

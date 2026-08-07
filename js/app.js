@@ -425,10 +425,15 @@
   /* ---------- pipeline forms ---------- */
   function pipelineSheet(id) {
     const s = S.get(); const v = Data.vertical();
-    const p = id ? s.pipeline.find((x) => x.id === id) : { name: '', detail: '', stage: v.pipelineStages[0], value: 0, sellingMonth: '', stalled: false };
+    const p = id ? s.pipeline.find((x) => x.id === id) : { name: '', businessName: '', phone: '', email: '', detail: '', stage: v.pipelineStages[0], value: 0, sellingMonth: '', stalled: false };
     UI.openSheet(`<h3>${id ? 'Edit' : 'Add'} ${UI.esc(v.pipelineNoun)}</h3>
+      <div class="field"><label>Business name (optional)</label><input class="input" id="p-business" value="${UI.esc(p.businessName || '')}" placeholder="e.g. Whitfield Realty"></div>
       <div class="field"><label>Name</label><input class="input" id="p-name" value="${UI.esc(p.name)}" placeholder="${v.pipelineNoun === 'vendor' ? 'Owner name' : 'Company / contact'}"></div>
       <div class="field"><label>Detail</label><input class="input" id="p-detail" value="${UI.esc(p.detail)}" placeholder="${v.pipelineNoun === 'vendor' ? 'Address' : 'Dept / size'}"></div>
+      <div class="grid2">
+        <div class="field"><label>Phone</label><input class="input" id="p-phone" type="tel" value="${UI.esc(p.phone || '')}" placeholder="04xx xxx xxx"></div>
+        <div class="field"><label>Email</label><input class="input" id="p-email" type="email" value="${UI.esc(p.email || '')}" placeholder="name@email.com"></div>
+      </div>
       <div class="field"><label>Stage</label><select class="input" id="p-stage">${v.pipelineStages.map((st) => `<option ${st === p.stage ? 'selected' : ''}>${st}</option>`).join('')}</select></div>
       <div class="grid2">
         <div class="field"><label>${UI.esc(v.valueLabel)} ($)</label><input class="input" id="p-value" type="number" inputmode="numeric" value="${p.value || 0}"></div>
@@ -439,7 +444,12 @@
     let stalled = p.stalled;
     $('p-stalled').addEventListener('click', function () { stalled = !stalled; this.classList.toggle('on'); });
     $('p-save').addEventListener('click', () => {
-      const obj = { name: $('p-name').value.trim(), detail: $('p-detail').value.trim(), stage: $('p-stage').value, value: +$('p-value').value || 0, sellingMonth: $('p-month').value.trim(), stalled, updated: Date.now() };
+      const obj = {
+        name: $('p-name').value.trim(), businessName: $('p-business').value.trim(),
+        phone: $('p-phone').value.trim(), email: $('p-email').value.trim(),
+        detail: $('p-detail').value.trim(), stage: $('p-stage').value,
+        value: +$('p-value').value || 0, sellingMonth: $('p-month').value.trim(), stalled, updated: Date.now(),
+      };
       if (!obj.name) { UI.toast('Name required'); return; }
       if (id) Object.assign(p, obj); else s.pipeline.unshift({ id: S.uid(), ...obj });
       UI.closeSheet(); rerender(); UI.toast('Saved');

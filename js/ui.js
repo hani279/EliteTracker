@@ -409,14 +409,9 @@
       <div class="card">
         <h3>Log today's numbers</h3>
         ${defs.map((m) => numberRow(m, day)).join('')}
-        <div class="hr"></div>
-        <div class="section-title">Outcomes (tap to add)</div>
-        <div style="display:flex;flex-wrap:wrap;gap:8px">
-          ${Data.outcomeDefs().map((o) => `<button class="tag ${o.bad ? 'red' : 'gold'}" data-act="outcome:${o.key}">${esc(o.label)} · ${(day.outcomes[o.key] || 0)}</button>`).join('')}
-        </div>
       </div>
 
-      <div class="tabs">${periods.map(([k, l]) => `<button class="${trackerPeriod === k ? 'on' : ''}" data-act="tracker-period:${k}">${l}</button>`).join('')}</div>
+      <div class="tabs" style="margin-top:20px">${periods.map(([k, l]) => `<button class="${trackerPeriod === k ? 'on' : ''}" data-act="tracker-period:${k}">${l}</button>`).join('')}</div>
 
       ${salesFunnelCard(agg, trackerPeriod)}
 
@@ -436,12 +431,9 @@
         </div>
       </div>
 
-      <div class="card">
-        <div class="section-title">Conversion funnel</div>
-        ${conv.map((c) => `<div class="kv"><span class="k">${esc(c.from)} → ${esc(c.to)}</span><span class="v">${Math.round(c.rate * 100)}%</span></div>`).join('') || '<p class="subtle">Log more to see conversions.</p>'}
-      </div>
+      ${conversionFunnelCard(conv)}
 
-      ${outcomesChart(agg, trackerPeriod)}
+      ${outcomesChart(agg, trackerPeriod, day)}
 
       ${twoWeekFocusCard()}
 
@@ -449,7 +441,7 @@
 
       <div class="card">
         <h3>Daily summary</h3>
-        <p class="subtle" style="margin:0 0 10px">Captured via the mic button below — for you and ${esc(s.profile.coachName)}.</p>
+        <p class="subtle" style="margin:0 0 10px">Captured via the mic button below, for you and ${esc(s.profile.coachName)}.</p>
         ${day.voiceNotes.length ? `<div class="subtle">${day.voiceNotes.length} voice note(s) saved today.</div>` : ''}
         ${(day.summary.did || day.summary.learned || day.summary.struggled) ? `<div class="callout" style="margin-top:10px">${esc(day.summary.did || day.summary.learned || day.summary.struggled)}</div>` : ''}
         ${!day.voiceNotes.length && !(day.summary.did || day.summary.learned || day.summary.struggled) ? '<p class="subtle" style="margin:0">Nothing captured yet today.</p>' : ''}
@@ -463,7 +455,7 @@
     const done = items.filter((f) => f.done).length;
     return `<div class="card">
       <h3>Two-Week Focus <span class="pill">${done}/${items.length}</span></h3>
-      <p class="subtle" style="margin:0 0 10px">Your priorities for the next two weeks — not tied to any single day.</p>
+      <p class="subtle" style="margin:0 0 10px">Your priorities for the next two weeks, not tied to any single day.</p>
       ${items.map((f) => `
         <div class="focus-item ${f.done ? 'done' : ''}" data-act="twfocus:${f.id}">
           <div class="check ${f.done ? 'done' : ''}">${f.done ? Icons.svg('check', { size: 12 }) : ''}</div>
@@ -547,7 +539,10 @@
 
   // Outcomes as its own chart widget — a simple bar chart (reusing the
   // vertical-bar pattern already in styles.css) instead of a plain kv list,
-  // colored by whether the outcome is good (gold) or bad (clay).
+  // colored by whether the outcome is good (gold) or bad (clay). Each bar
+  // is itself the "tap to add" control now — clicking it opens the same
+  // increment sheet the old tag row used to (which operates on today's
+  // count regardless of which period the chart is currently showing).
   function outcomesChart(agg, period) {
     const outs = Data.outcomeDefs();
     const max = Math.max(...outs.map((o) => agg.outcomes[o.key].actual), 1);
@@ -557,8 +552,41 @@
         ${outs.map((o) => {
           const val = agg.outcomes[o.key].actual;
           const h = Math.round((val / max) * 100);
-          return `<div class="bar"><div class="n">${val}</div><div class="col" style="height:${Math.max(6, h)}%;background:${o.bad ? 'var(--clay)' : 'var(--gold)'}"></div><div class="lbl">${esc(o.label)}</div></div>`;
+          return `<div class="bar" data-act="outcome:${o.key}" style="cursor:pointer"><div class="n">${val}</div><div class="col" style="height:${Math.max(6, h)}%;background:${o.bad ? 'var(--clay)' : 'var(--gold)'}"></div><div class="lbl">${esc(o.label)}</div></div>`;
         }).join('')}
+      </div>
+      <p class="subtle" style="margin:10px 0 0;text-align:center">Tap a bar to log one.</p>
+    </div>`;
+  }
+
+  // Conversion funnel — a second funnel visual, deliberately styled
+  // differently from the Activity Funnel above so the two aren't
+  // mistaken for each other: single gold hue fading toward the narrow
+  // end (vs. the Activity Funnel's per-stage red/orange/green), and
+  // width here is cumulative retention from the first stage rather
+  // than raw counts.
+  function conversionFunnelCard(conv) {
+    if (!conv.length) return `<div class="card"><h3>Conversion Funnel</h3><p class="subtle" style="margin:0">Log more to see conversions.</p></div>`;
+    const stages = [{ label: conv[0].from, cum: 1 }];
+    let cum = 1;
+    conv.forEach((c) => { cum *= c.rate; stages.push({ label: c.to, cum }); });
+    const widths = stages.map((s) => Math.max(10, Math.round(s.cum * 100)));
+    return `<div class="card">
+      <h3>Conversion Funnel</h3>
+      <div class="funnel3">
+        <div class="funnel3-shape">
+          ${stages.map((s, i) => {
+            const top = widths[i], bottom = i < stages.length - 1 ? widths[i + 1] : widths[i];
+            const shade = (1 - (i / Math.max(1, stages.length - 1)) * 0.6).toFixed(2);
+            return `<div class="funnel3-seg" style="opacity:${shade};clip-path:${funnelClip(top, bottom)}"></div>`;
+          }).join('')}
+        </div>
+        <div class="funnel3-legend">
+          ${stages.map((s) => `<div class="funnel3-row">
+            <span class="funnel3-label">${esc(s.label)}</span>
+            <span class="funnel3-pct">${Math.round(s.cum * 100)}%</span>
+          </div>`).join('')}
+        </div>
       </div>
     </div>`;
   }
@@ -569,7 +597,7 @@
     const s = S.get();
     return `<div class="card">
       <h3>Special Ops</h3>
-      <p class="subtle" style="margin:0 0 10px">Time-boxed focus campaigns — e.g. expired listings, win-backs, a farm street.</p>
+      <p class="subtle" style="margin:0 0 10px">Time-boxed focus campaigns, e.g. expired listings, win-backs, a farm street.</p>
       ${s.specialOps.map((op) => specialOpCard(op)).join('') || '<p class="subtle" style="margin:8px 0">No special operations running.</p>'}
       <button class="btn ghost sm" data-act="add-specialop" style="margin-top:10px">${Icons.svg('plus', { size: 14 })} New special operation</button>
     </div>`;
@@ -596,9 +624,10 @@
 
   function pipeRow(p, db) {
     const tone = p.stalled ? 'red' : (/(sold|won|listed|listing)/i.test(p.stage) ? 'green' : '');
+    const sub = p.businessName ? `${p.businessName} · ${p.detail || 'no detail'}` : (p.detail || '');
     return `<div class="lrow" data-act="edit-pipeline:${p.id}">
       <div class="mono">${initials(p.name)}</div>
-      <div class="main"><div class="t">${esc(p.name)}</div><div class="s">${esc(p.detail || '')}</div></div>
+      <div class="main"><div class="t">${esc(p.name)}</div><div class="s">${esc(sub)}</div></div>
       <div class="right"><span class="tag ${tone}">${esc(p.stage)}</span>${p.stalled ? '<div class="subtle" style="font-size:10px;color:var(--clay);margin-top:3px">Stalled</div>' : `<div class="subtle" style="font-size:10px;margin-top:3px">${money(p.value)}</div>`}</div>
     </div>`;
   }
