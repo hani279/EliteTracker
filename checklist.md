@@ -4,6 +4,10 @@ Source: Fathom meeting — "App Discussion: Hani / Harry", ELITE Sales Coaching 
 
 Goal: strip the app down to a simple "tick, tick, tick" daily-tracking MVP. Cut anything that adds cognitive load without earning its place yet — Auto Nudge, Predictive Plan, AI-generated copy, CRM, the standalone Reports tab.
 
+## Testing (not from the original meeting)
+
+- [x] Superuser preview toggle — an allowlisted tester account can flip between the consultant and coach UI from one login, without changing its real role. See `Auth.isSuperuser` / `SUPERUSER_EMAILS` in `js/auth.js`. Account: `tester@captur.com.au` (credentials shared separately).
+
 ## Navigation
 
 - [x] Consolidate bottom nav to three tabs: **Tracker**, **Pipeline**, **Voice Log**
