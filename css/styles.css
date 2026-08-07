@@ -319,6 +319,13 @@ svg{display:block}
 .bottomnav button.on{color:var(--gold-ink)}
 .bottomnav button.on .ic{background:var(--gold-tint)}
 
+/* Voice Log — a raised, central action rather than a plain tab, to
+   encourage actually using the recorder instead of it hiding in a card. */
+.bottomnav .voicebtn{flex:0 0 auto;width:54px;height:54px;border-radius:50%;background:var(--gold);margin-top:-22px;box-shadow:var(--shadow-floating);border:3px solid var(--page-bg)}
+.bottomnav .voicebtn .ic{width:auto;height:auto}
+.bottomnav .voicebtn .ic svg{width:23px;height:23px;color:var(--ink)}
+.bottomnav .voicebtn:active{background:var(--gold-dim)}
+
 /* ---------- Forms ---------- */
 .field{margin-bottom:16px}
 .field label{display:block;font-size:12px;font-weight:600;color:var(--bone-faint);margin-bottom:7px}

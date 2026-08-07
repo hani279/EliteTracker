@@ -31,6 +31,29 @@
     return `${S.fmtShort(keys[0])} – ${S.fmtShort(keys[keys.length - 1])}`;
   }
 
+  // ---- calendar-based "to date" ranges (Today / WTD / MTD / YTD) ----
+  // Distinct from rangeKeys' rolling N-day windows above — these start at
+  // the calendar boundary (Monday, the 1st, Jan 1) and run through today,
+  // per the simplified Tracker page's standardized time filters.
+  const TO_DATE_LABELS = { today: 'Today', wtd: 'Week to date', mtd: 'Month to date', ytd: 'Year to date' };
+  function rangeKeysToDate(type, ref) {
+    ref = ref || S.todayKey();
+    const refDate = S.parseKey(ref);
+    let start;
+    if (type === 'wtd') {
+      start = new Date(refDate);
+      const dow = start.getDay(); // 0=Sun..6=Sat
+      start.setDate(start.getDate() - (dow === 0 ? 6 : dow - 1)); // back to Monday
+    } else if (type === 'mtd') start = new Date(refDate.getFullYear(), refDate.getMonth(), 1);
+    else if (type === 'ytd') start = new Date(refDate.getFullYear(), 0, 1);
+    else start = new Date(refDate); // 'today'
+
+    const out = []; let k = S.todayKey(start);
+    while (S.parseKey(k) <= refDate) { out.push(k); k = S.addDays(k, 1); }
+    return out;
+  }
+  function rangeLabelToDate(type) { return TO_DATE_LABELS[type] || type; }
+
   function weekdaysLeftInWeek() {
     const d = new Date(); let count = 0;
     for (let i = d.getDay(); i <= 5; i++) if (i >= 1) count++;
@@ -260,7 +283,7 @@
   }
 
   global.Intel = {
-    rangeKeys, rangeLabel, aggregate, metricPace, conversions,
+    rangeKeys, rangeLabel, rangeKeysToDate, rangeLabelToDate, aggregate, metricPace, conversions,
     todayPace, callsToday, streak, suggestions, predictive,
     buildReport, reportToText, weekdaysLeftInWeek,
   };

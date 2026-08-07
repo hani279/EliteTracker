@@ -141,8 +141,8 @@
     if (cmd === 'vn-play') return playVoice(a);
     if (cmd === 'vn-del') return delVoice(a);
 
-    // ---- track ----
-    if (cmd === 'track-period') { UI.trackPeriod = a; rerender(); return; }
+    // ---- tracker ----
+    if (cmd === 'tracker-period') { UI.trackerPeriod = a; rerender(); return; }
 
     // ---- pipeline ----
     if (cmd === 'pipe-tab') { UI.pipeTab = a; rerender(); return; }
@@ -153,15 +153,13 @@
     if (cmd === 'specialop-add') return opItemSheet(a);
 
     // ---- crm ----
+    // No UI currently calls these — the CRM tab was removed from nav (it's
+    // being rethought as a bigger project than a simple contact list). The
+    // data model, sync, and this add/edit sheet are left in place so bringing
+    // it back is a routing change, not a rebuild.
     if (cmd === 'add-crm') return crmSheet(null);
     if (cmd === 'edit-crm') return crmSheet(a);
     if (cmd === 'crm-done') { e.stopPropagation(); return crmDone(a); }
-
-    // ---- reports ----
-    if (cmd === 'report-type') { UI.reportType = a; rerender(); return; }
-    if (cmd === 'send-report') return sendReport();
-    if (cmd === 'copy-report') return copyReport();
-    if (cmd === 'pdf-report') return pdfReport();
 
     // ---- goals / build ----
     if (cmd === 'edit-build') return buildSheet();
@@ -548,38 +546,6 @@
     const url = URL.createObjectURL(blob); const a = document.createElement('a');
     a.href = url; a.download = name; document.body.appendChild(a); a.click();
     setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 500);
-  }
-
-  /* ---------- reports send / copy ---------- */
-  function currentReportText() { return Intel.reportToText(Intel.buildReport(UI.reportType)); }
-  async function sendReport() {
-    const r = Intel.buildReport(UI.reportType);
-    const text = Intel.reportToText(r);
-    S.get().reportsLog.unshift({ id: S.uid(), type: UI.reportType, rangeLabel: r.rangeLabel, date: Date.now(), score: r.score }); S.save();
-    if (navigator.share) {
-      try { await navigator.share({ title: r.title, text }); UI.toast('Shared to ' + r.coachName); return; } catch (e) {}
-    }
-    const subject = encodeURIComponent(`ELITE Tracker — ${r.title} — ${r.agentName}`);
-    const body = encodeURIComponent(text);
-    window.location.href = `mailto:?subject=${subject}&body=${body}`;
-    UI.toast('Opening email to ' + r.coachName);
-  }
-  async function copyReport() {
-    try { await navigator.clipboard.writeText(currentReportText()); UI.toast('Report copied'); }
-    catch (e) { UI.toast('Copy not supported'); }
-  }
-  function pdfReport() {
-    // No PDF library needed — the browser's own print dialog offers
-    // "Save as PDF" everywhere, and document.title becomes its default
-    // filename. css/styles.css's @media print block strips the app chrome
-    // down to just the report card content for this. window.print() blocks
-    // until the dialog closes on some browsers but not others, so the
-    // title is restored on 'afterprint' rather than right after the call.
-    const r = Intel.buildReport(UI.reportType);
-    const prevTitle = document.title;
-    document.title = `ELITE Tracker — ${r.title} — ${r.agentName}`;
-    window.addEventListener('afterprint', () => { document.title = prevTitle; }, { once: true });
-    window.print();
   }
 
   /* ---------- build framework + goals ---------- */

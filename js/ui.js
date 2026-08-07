@@ -45,19 +45,6 @@
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   // ---------- primitives ----------
-  function ring(pct, label, opt) {
-    opt = opt || {}; const size = opt.size || 64;
-    const r = (size - 8) / 2, c = 2 * Math.PI * r, off = c * (1 - Math.min(pct, 100) / 100);
-    const track = 'var(--hairline)';
-    const col = opt.color || 'var(--gold)';
-    return `<div class="ringwrap" style="width:${size}px;height:${size}px">
-      <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-        <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${track}" stroke-width="6"/>
-        <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${col}" stroke-width="6" stroke-linecap="round"
-          stroke-dasharray="${c}" stroke-dashoffset="${off}" transform="rotate(-90 ${size / 2} ${size / 2})"/>
-      </svg><div class="rt"><div class="p" style="${opt.dark ? '' : ''}">${pct}%</div><div class="l">${label || ''}</div></div></div>`;
-  }
-
   function initials(name) { return (name || '?').split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase(); }
 
   // ---------- toast ----------
@@ -303,7 +290,7 @@
   /* ============================================================
      TOP BAR + BOTTOM NAV
      ============================================================ */
-  const AGENT_TITLES = { today: 'Dashboard', track: 'Tracker', pipeline: 'Pipeline', crm: 'CRM', reports: 'Reports', goals: 'Goals' };
+  const AGENT_TITLES = { today: 'Tracker', pipeline: 'Pipeline', goals: 'Goals' };
   const COACH_TITLES = { dashboard: 'Coach Dashboard', clients: 'Clients', alerts: 'Alerts' };
 
   function renderTopbar() {
@@ -332,9 +319,13 @@
       nav.innerHTML = items.map(([k, ic, l]) =>
         `<button class="${coachView === k ? 'on' : ''}" data-act="cnav:${k}"><span class="ic">${Icons.svg(ic)}</span>${l}${k === 'alerts' && alertN ? ` <span class="badge">${alertN}</span>` : ''}</button>`).join('');
     } else {
-      const items = [['today', 'home', 'Today'], ['track', 'chart', 'Track'], ['pipeline', 'folder', 'Pipeline'], ['crm', 'user', 'CRM'], ['reports', 'file', 'Reports']];
-      nav.innerHTML = items.map(([k, ic, l]) =>
-        `<button class="${current === k ? 'on' : ''}" data-act="nav:${k}"><span class="ic">${Icons.svg(ic)}</span>${l}</button>`).join('');
+      // Three tabs, with Voice Log as a raised, central action rather than
+      // a plain nav item — it opens the recorder sheet directly (like the
+      // existing 'open-voice' trigger elsewhere), it doesn't route to a view.
+      nav.innerHTML = `
+        <button class="${current === 'today' ? 'on' : ''}" data-act="nav:today"><span class="ic">${Icons.svg('home')}</span>Tracker</button>
+        <button class="voicebtn" data-act="open-voice" aria-label="Record voice log"><span class="ic">${Icons.svg('mic', { size: 22 })}</span></button>
+        <button class="${current === 'pipeline' ? 'on' : ''}" data-act="nav:pipeline"><span class="ic">${Icons.svg('folder')}</span>Pipeline</button>`;
     }
   }
 
@@ -375,10 +366,7 @@
   function agentScreen() {
     switch (current) {
       case 'today': return viewToday();
-      case 'track': return viewTrack();
       case 'pipeline': return viewPipeline();
-      case 'crm': return viewCRM();
-      case 'reports': return viewReports();
       case 'goals': return viewGoals();
       default: return viewToday();
     }
@@ -395,22 +383,49 @@
   /* ============================================================
      AGENT — TODAY (dashboard: focus, log, coach, summary, predict)
      ============================================================ */
+  // Tracker page — Today's dashboard, the daily log, the activity funnel,
+  // and Special Ops all merged into one screen per the MVP simplification
+  // pass. No AI-generated copy, Auto Nudge, or Predictive Plan here
+  // anymore — that read is the coach's job, not the app's.
+  let trackerPeriod = 'wtd';
   function viewToday() {
     const s = S.get(); const day = S.dayRecord(S.todayKey());
-    const calls = Intel.callsToday(); const pace = Intel.todayPace(); const st = Intel.streak();
+    const defs = Data.activityDefs();
+    const st = Intel.streak();
     const doneFocus = day.focus.filter((f) => f.done).length;
-    const pred = Intel.predictive();
+    const agg = Intel.aggregate(Intel.rangeKeysToDate(trackerPeriod));
+    const conv = Intel.conversions(agg);
+    const periods = [['today', 'Today'], ['wtd', 'WTD'], ['mtd', 'MTD'], ['ytd', 'YTD']];
 
     return `
     <section class="screen active">
       <div class="hero">
         <h2>${greeting()}, ${esc(s.profile.name.split(' ')[0])}</h2>
-        <div class="meta"><span>${S.fmtDate(S.todayKey())}</span><span>·</span><span class="streak">${st}-day streak</span><span>·</span><span>numbers due ${s.settings.numbersDue}</span></div>
-        <div class="hero-stats">
-          <div class="hero-stat"><div class="k">Today's calls</div><div class="v">${calls.done}/${calls.target}</div></div>
-          <div class="hero-stat"><div class="k">Day pace</div><div class="v gold">${pace}%</div></div>
-          <div class="ring">${ring(pace, 'FOCUS')}</div>
+        <div class="meta"><span>${S.fmtDate(S.todayKey())}</span><span>·</span><span class="streak">${st}-day streak</span></div>
+      </div>
+
+      <div class="card">
+        <h3>Log today's numbers</h3>
+        ${defs.map((m) => numberRow(m, day)).join('')}
+        <div class="hr"></div>
+        <div class="section-title">Outcomes (tap to add)</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          ${Data.outcomeDefs().map((o) => `<button class="tag ${o.bad ? 'red' : 'gold'}" data-act="outcome:${o.key}">${esc(o.label)} · ${(day.outcomes[o.key] || 0)}</button>`).join('')}
         </div>
+      </div>
+
+      <div class="tabs">${periods.map(([k, l]) => `<button class="${trackerPeriod === k ? 'on' : ''}" data-act="tracker-period:${k}">${l}</button>`).join('')}</div>
+
+      ${salesFunnelCard(agg)}
+
+      <div class="card">
+        <div class="section-title">Conversion funnel</div>
+        ${conv.map((c) => `<div class="kv"><span class="k">${esc(c.from)} → ${esc(c.to)}</span><span class="v">${Math.round(c.rate * 100)}%</span></div>`).join('') || '<p class="subtle">Log more to see conversions.</p>'}
+      </div>
+
+      <div class="card">
+        <div class="section-title">Outcomes · ${Intel.rangeLabelToDate(trackerPeriod).toLowerCase()}</div>
+        ${Data.outcomeDefs().map((o) => `<div class="kv"><span class="k">${esc(o.label)}</span><span class="v" style="color:${o.bad ? 'var(--clay)' : 'var(--green)'}">${agg.outcomes[o.key].actual}</span></div>`).join('')}
       </div>
 
       ${twoWeekFocusCard()}
@@ -431,33 +446,14 @@
         </div>
       </div>
 
-      ${salesFunnelCard()}
-
-      <div class="card dark">
-        <div class="coach-msg">
-          <div class="avatar">${initials(s.profile.coachName)}</div>
-          <div>
-            <div class="who">${esc(s.profile.coachName)} · your coach</div>
-            <div class="when">auto-nudge · ${nowTime()}</div>
-            <div class="quote">"${coachNudge(pace, calls)}"</div>
-          </div>
-        </div>
-      </div>
+      ${specialOpsCard()}
 
       <div class="card">
-        <h3>Daily summary & voice note</h3>
+        <h3>Daily summary</h3>
         <p class="subtle" style="margin:0 0 10px">What did you do, what did you learn, where did you struggle? Captured for you and ${esc(s.profile.coachName)}.</p>
-        <div class="btn-row">
-          <button class="btn gold" data-act="open-voice">${Icons.svg('mic', { size: 15 })} Record voice note</button>
-          <button class="btn outline" data-act="open-summary">${Icons.svg('edit', { size: 15 })} Write summary</button>
-        </div>
+        <button class="btn outline" data-act="open-summary">${Icons.svg('edit', { size: 15 })} Write summary</button>
         ${day.voiceNotes.length ? `<div class="subtle" style="margin-top:10px">${day.voiceNotes.length} voice note(s) saved today.</div>` : ''}
         ${(day.summary.did || day.summary.learned || day.summary.struggled) ? `<div class="callout" style="margin-top:10px">${esc(day.summary.did || day.summary.learned || day.summary.struggled)}</div>` : ''}
-      </div>
-
-      <div class="card">
-        <h3>Predictive plan — tomorrow</h3>
-        ${pred.plans.map((p, i) => `<div class="callout" style="margin-top:${i ? 8 : 0}px">${Icons.svg('target', { size: 15 })}<span>${esc(p.text)}</span></div>`).join('')}
       </div>
 
       <div class="card" data-act="nav:goals" style="cursor:pointer">
@@ -487,10 +483,9 @@
   function numberRow(m, day) {
     const s = S.get(); const val = day.numbers[m.key] || 0; const tgt = s.targets[m.key] ?? m.target;
     const pct = Math.min(100, tgt ? Math.round((val / tgt) * 100) : 0);
-    const over = val >= tgt && tgt > 0;
     return `<div class="num-row">
       <div class="label"><div class="l">${esc(m.label)}</div>
-        <div class="track"><div class="fill ${over ? 'over' : ''}" style="width:${pct}%"></div></div></div>
+        <div class="track"><div class="fill" style="width:${pct}%;background:${paceColor(pct)}"></div></div></div>
       <div class="stepper">
         <button class="minus" data-act="num:${m.key}:-">${Icons.svg('minus', { size: 13 })}</button>
         <div class="val">${val}<span class="t">/${tgt}</span></div>
@@ -526,8 +521,7 @@
     return `polygon(${tl}% 0%, ${tr}% 0%, ${br}% 100%, ${bl}% 100%)`;
   }
 
-  function salesFunnelCard() {
-    const agg = Intel.aggregate(Intel.rangeKeys('weekly'));
+  function salesFunnelCard(agg) {
     const funnelKeys = Data.vertical().funnel;
     const stages = funnelKeys.map((key) => {
       const m = agg.metrics[key];
@@ -535,11 +529,9 @@
     });
     const maxActual = Math.max(...stages.map((s) => s.actual), 1);
     const widths = stages.map((s) => Math.max(10, Math.round((s.actual / maxActual) * 100)));
-    const tips = Intel.suggestions(agg);
-    const topTip = tips.find((t) => t.tone === 'warn') || tips[0];
 
     return `<div class="card">
-      <h3>Activity Funnel <span class="pill">This week</span></h3>
+      <h3>Activity Funnel</h3>
       <div class="funnel2">
         <div class="funnel2-shape">
           ${stages.map((s, i) => {
@@ -556,58 +548,19 @@
           </div>`).join('')}
         </div>
       </div>
-      ${topTip ? `<div class="callout ${topTip.tone === 'good' ? 'green' : ''}" style="margin-top:14px">${Icons.svg(topTip.tone === 'good' ? 'check' : 'target', { size: 15 })}<span>${esc(topTip.text)}</span></div>` : ''}
     </div>`;
   }
 
-  /* ============================================================
-     AGENT — TRACK
-     ============================================================ */
-  let trackPeriod = 'weekly';
-  function viewTrack() {
-    const agg = Intel.aggregate(Intel.rangeKeys(trackPeriod));
-    const defs = Data.activityDefs(); const outs = Data.outcomeDefs();
-    const conv = Intel.conversions(agg);
-    const day = S.dayRecord(S.todayKey());
-    const tabs = [['daily', 'Daily'], ['weekly', 'Weekly'], ['month', 'Monthly']];
-    return `<section class="screen active">
-      <div class="card">
-        <h3>Log today's numbers <span class="pill">${Data.vertical().label}</span></h3>
-        ${defs.map((m) => numberRow(m, day)).join('')}
-        <div class="hr"></div>
-        <div class="section-title">Outcomes (tap to add)</div>
-        <div style="display:flex;flex-wrap:wrap;gap:8px">
-          ${Data.outcomeDefs().map((o) => `<button class="tag ${o.bad ? 'red' : 'gold'}" data-act="outcome:${o.key}">${esc(o.label)} · ${(day.outcomes[o.key] || 0)}</button>`).join('')}
-        </div>
-      </div>
-
-      <div class="tabs">${tabs.map(([k, l]) => `<button class="${trackPeriod === k ? 'on' : ''}" data-act="track-period:${k}">${l}</button>`).join('')}</div>
-      <div class="card" style="display:flex;align-items:center;gap:14px">
-        ${ring(agg.pace, 'PACE', { light: true, color: agg.pace >= 85 ? 'var(--green)' : 'var(--gold)' })}
-        <div><div style="font-weight:600;font-size:16px">${agg.pace >= 100 ? 'Ahead of pace' : agg.pace >= 85 ? 'On pace' : 'Behind pace'}</div>
-        <div class="subtle">Hitting ${agg.pace}% of activity targets over ${Intel.rangeLabel(trackPeriod)}.</div></div>
-      </div>
-
-      <div class="card">
-        <div class="section-title">Activity</div>
-        ${defs.map((d) => { const m = agg.metrics[d.key]; const p = Intel.metricPace(m); const w = Math.min(100, p);
-          return `<div class="num-row"><div class="label"><div class="l">${esc(m.label)}</div>
-            <div class="track"><div class="fill ${p >= 100 ? 'over' : ''}" style="width:${w}%"></div></div></div>
-            <div class="stepper"><div class="val">${m.actual}<span class="t">/${m.target}</span></div>
-            <span class="tag ${p >= 100 ? 'green' : p < 70 ? 'red' : 'amber'}" style="min-width:44px;text-align:center">${p}%</span></div></div>`;
-        }).join('')}
-      </div>
-
-      <div class="card">
-        <div class="section-title">Conversion funnel</div>
-        ${conv.map((c) => `<div class="kv"><span class="k">${esc(c.from)} → ${esc(c.to)}</span><span class="v">${Math.round(c.rate * 100)}%</span></div>`).join('') || '<p class="subtle">Log more to see conversions.</p>'}
-      </div>
-
-      <div class="card">
-        <div class="section-title">Outcomes · this period</div>
-        ${outs.map((o) => `<div class="kv"><span class="k">${esc(o.label)}</span><span class="v" style="color:${o.bad ? 'var(--clay)' : 'var(--green)'}">${agg.outcomes[o.key].actual}</span></div>`).join('')}
-      </div>
-    </section>`;
+  // Special Ops — folded into the Tracker page (used to be Pipeline's
+  // third sub-tab).
+  function specialOpsCard() {
+    const s = S.get();
+    return `<div class="card">
+      <h3>Special Ops</h3>
+      <p class="subtle" style="margin:0 0 10px">Time-boxed focus campaigns — e.g. expired listings, win-backs, a farm street.</p>
+      ${s.specialOps.map((op) => specialOpCard(op)).join('') || '<p class="subtle" style="margin:8px 0">No special operations running.</p>'}
+      <button class="btn ghost sm" data-act="add-specialop" style="margin-top:10px">${Icons.svg('plus', { size: 14 })} New special operation</button>
+    </div>`;
   }
 
   /* ============================================================
@@ -617,7 +570,7 @@
   let pipeSearch = '';
   function viewPipeline() {
     const s = S.get(); const v = Data.vertical();
-    const tabs = [['pipeline', 'Pipeline'], ['database', 'Database'], ['special', 'Special Ops']];
+    const tabs = [['pipeline', 'Pipeline'], ['database', 'Database']];
     let body = '';
     if (pipeTab === 'pipeline') {
       const active = s.pipeline.filter((p) => !p.stalled).length;
@@ -629,7 +582,7 @@
           <div class="s gold"><div class="v">${money(val)}</div><div class="k">${esc(v.valueLabel)}</div></div>
         </div>
         <div class="card">${s.pipeline.map((p) => pipeRow(p)).join('') || emptyState('No ' + v.pipelineNoun + 's yet.')}</div>`;
-    } else if (pipeTab === 'database') {
+    } else {
       const q = pipeSearch.trim().toLowerCase();
       const filtered = s.pipeline.filter((p) => !q || (p.name + ' ' + (p.detail || '')).toLowerCase().includes(q));
       body = `<div class="card">
@@ -640,15 +593,11 @@
         </div>
         ${filtered.concat([]).sort((a, b) => a.name.localeCompare(b.name)).map((p) => pipeRow(p, true)).join('') || emptyState(q ? 'No matches for "' + pipeSearch + '".' : 'Database is empty.')}
       </div>`;
-    } else {
-      body = `<div class="card"><p class="subtle" style="margin:0 0 6px">Time-boxed focus campaigns — e.g. expired listings, win-backs, a farm street.</p></div>
-        ${s.specialOps.map((op) => specialOpCard(op)).join('') || emptyState('No special operations running.')}
-        <button class="btn gold" data-act="add-specialop" style="margin-top:12px">${Icons.svg('plus', { size: 14 })} New special operation</button>`;
     }
     return `<section class="screen active">
       <div class="tabs">${tabs.map(([k, l]) => `<button class="${pipeTab === k ? 'on' : ''}" data-act="pipe-tab:${k}">${l}</button>`).join('')}</div>
       ${body}
-      ${pipeTab !== 'special' ? `<button class="btn gold" data-act="add-pipeline" style="margin-top:12px">${Icons.svg('plus', { size: 14 })} Add ${esc(v.pipelineNoun)}</button>` : ''}
+      <button class="btn gold" data-act="add-pipeline" style="margin-top:12px">${Icons.svg('plus', { size: 14 })} Add ${esc(v.pipelineNoun)}</button>
     </section>`;
   }
 
@@ -669,68 +618,6 @@
         <div class="check ${i.done ? 'done' : ''}">${i.done ? Icons.svg('check', { size: 12 }) : ''}</div><div class="txt">${esc(i.name)}</div></div>`).join('')}
       <div class="btn-row" style="margin-top:10px"><button class="btn ghost sm" data-act="specialop-add:${op.id}">${Icons.svg('plus', { size: 14 })} Add target</button></div>
     </div>`;
-  }
-
-  /* ============================================================
-     AGENT — CRM
-     ============================================================ */
-  // Disabled for now — the CRM is being rethought as a bigger project
-  // than a simple contact list. The rest of the CRM code (data model,
-  // sync, the add/edit sheet) is left in place underneath this so it's
-  // a one-line flip to bring back, not a rebuild.
-  function viewCRM() {
-    return `<section class="screen active">
-      <div class="card" style="text-align:center;padding:40px 20px">
-        ${Icons.svg('user', { size: 28 })}
-        <h3 style="margin:14px 0 6px">CRM — Launching soon</h3>
-        <p class="subtle" style="margin:0">We're building something bigger than a simple contact list here. Check back soon.</p>
-      </div>
-    </section>`;
-  }
-
-  /* ============================================================
-     AGENT — REPORTS
-     ============================================================ */
-  let reportType = 'weekly';
-  function viewReports() {
-    const s = S.get();
-    const r = Intel.buildReport(reportType);
-    const types = [['daily', 'Day'], ['weekly', 'Week'], ['fortnight', 'Fortnight'], ['month', 'Month'], ['quarter', 'QTR'], ['biyear', 'Bi-Year']];
-    return `<section class="screen active">
-      <div class="tabs">${types.map(([k, l]) => `<button class="${reportType === k ? 'on' : ''}" data-act="report-type:${k}">${l}</button>`).join('')}</div>
-      <div class="card dark" style="display:flex;align-items:center;gap:14px">
-        ${ring(r.score, '', { color: 'var(--gold)' })}
-        <div><div style="font-family:var(--headline);font-size:22px;font-weight:480">${r.title}</div>
-        <div class="subtle" style="color:var(--bone-muted)">${r.rangeLabel}</div>
-        <div class="subtle" style="margin-top:2px">Auto-shared with ${esc(r.coachName)}</div></div>
-      </div>
-
-      <div class="card"><div class="section-title">Activity vs target</div>${weekBarsFor(r.agg)}</div>
-
-      <div class="card"><div class="section-title">What's working</div>
-        <ul class="list-plain">${r.working.map((w) => `<li><span class="mk">${Icons.svg('check', { size: 14 })}</span><span>${esc(w)}</span></li>`).join('') || '<li class="subtle">Keep logging to surface wins.</li>'}</ul>
-      </div>
-      <div class="card"><div class="section-title">Areas to improve</div>
-        <ul class="list-plain">${r.improve.map((w) => `<li><span class="mk warn">${Icons.svg('target', { size: 14 })}</span><span>${esc(w)}</span></li>`).join('') || '<li class="subtle">Nothing flagged — strong period.</li>'}</ul>
-      </div>
-
-      <div class="btn-row" style="margin-top:14px">
-        <button class="btn gold" data-act="send-report">Send to ${esc(r.coachName)}</button>
-        <button class="btn outline" data-act="copy-report">Copy</button>
-        <button class="btn outline" data-act="pdf-report">${Icons.svg('file', { size: 14 })} PDF</button>
-      </div>
-      <p class="subtle" style="text-align:center;margin-top:10px">Daily, weekly, fortnight, month, QTR & bi-year — generated from your logged inputs.</p>
-    </section>`;
-  }
-
-  function weekBarsFor(agg) {
-    const defs = Data.activityDefs();
-    const max = Math.max(...defs.map((d) => Math.max(agg.metrics[d.key].actual, agg.metrics[d.key].target, 1)));
-    return `<div class="bars">${defs.map((d) => {
-      const m = agg.metrics[d.key]; const h = Math.round((m.actual / max) * 100);
-      const cls = m.actual >= m.target ? 'over' : (m.actual < m.target * 0.7 ? 'under' : '');
-      return `<div class="bar"><div class="n">${m.actual}</div><div class="col ${cls}" style="height:${Math.max(6, h)}%"></div><div class="lbl">${esc(d.short)}</div></div>`;
-    }).join('')}</div>`;
   }
 
   /* ============================================================
@@ -852,15 +739,8 @@
      helpers
      ============================================================ */
   function greeting() { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; }
-  function nowTime() { return new Date().toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' }); }
   function money(n) { n = n || 0; if (n >= 1e6) return '$' + (n / 1e6).toFixed(1) + 'm'; if (n >= 1e3) return '$' + Math.round(n / 1e3) + 'k'; return '$' + n; }
   function emptyState(msg) { return `<div class="empty">${Icons.svg('inbox', { size: 26 })}${esc(msg)}</div>`; }
-  function coachNudge(pace, calls) {
-    const left = Math.max(0, calls.target - calls.done);
-    if (pace >= 100) return `You're over target already — bank it, then get one more appraisal booked before you switch off.`;
-    if (left > 0) return `You're at ${pace}% of today with ${left} calls to go. Two 25-minute blocks clears it — protect 2:00 and 4:00.`;
-    return `Calls done. Now convert — follow up two warm ones before the day closes.`;
-  }
 
   global.UI = {
     render, renderOnboarding, toast, openSheet, closeSheet,
@@ -872,12 +752,11 @@
     get authInfo() { return authInfo; }, set authInfo(v) { authInfo = v; },
     get pipeTab() { return pipeTab; }, set pipeTab(v) { pipeTab = v; },
     get pipeSearch() { return pipeSearch; }, set pipeSearch(v) { pipeSearch = v; },
-    get trackPeriod() { return trackPeriod; }, set trackPeriod(v) { trackPeriod = v; },
+    get trackerPeriod() { return trackerPeriod; }, set trackerPeriod(v) { trackerPeriod = v; },
     get clientSearch() { return clientSearch; }, set clientSearch(v) { clientSearch = v; },
     get clientStatusFilter() { return clientStatusFilter; }, set clientStatusFilter(v) { clientStatusFilter = v; },
     get clientSort() { return clientSort; }, set clientSort(v) { clientSort = v; },
-    get reportType() { return reportType; }, set reportType(v) { reportType = v; },
     get onbTmp() { return onbTmp; },
-    captureOnb, finishOnboarding, clearOnbDraft, initials, esc, money, ring, sparkline,
+    captureOnb, finishOnboarding, clearOnbDraft, initials, esc, money, sparkline,
   };
 })(window);
