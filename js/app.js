@@ -138,6 +138,7 @@
 
     // ---- menu ----
     if (cmd === 'open-menu') return openMenu();
+    if (cmd === 'open-settings') return openSettings();
     if (cmd === 'refresh-roster') return refreshRosterTap();
     if (cmd === 'close-sheet') return UI.closeSheet();
 
@@ -790,28 +791,38 @@
   function openMenu() {
     const s = S.get();
     const session = Auth.getSession();
+    const mode = UI.effectiveMode(s);
     UI.openSheet(`<h3>Menu</h3>
       ${session ? `<p class="subtle" style="margin:-8px 0 16px">Signed in as ${UI.esc(session.email)}${session.provider === 'google' ? ' · Google' : ''}</p>` : ''}
       <div class="tile-grid">
-        ${tile({ id: 'm-theme', icon: s.settings.theme === 'light' ? 'sun' : 'moon', label: 'Appearance', sub: s.settings.theme === 'light' ? 'Light' : 'Dark' })}
-        ${Auth.isSuperuser() ? tile({ act: 'toggle-preview', icon: 'swap', label: 'Preview', sub: UI.effectiveMode(s) === 'coach' ? 'Coach' : 'Consultant' }) : ''}
-        ${s.mode === 'agent' ? tile({ act: 'nav:goals', icon: 'flag', label: 'Goals' }) : ''}
-        ${s.mode === 'agent' ? tile({ id: 'm-inbox', icon: 'inbox', label: 'Messages' }) : ''}
-        ${tile({ id: 'm-reminders', icon: 'bell', label: 'Reminders', sub: s.settings.remindersEnabled ? 'On' : 'Off' })}
-        ${s.mode === 'agent' ? tile({ id: 'm-coachcode', icon: 'target', label: 'Coach', sub: s.profile.coachId ? UI.esc(s.profile.coachName) : 'Not linked' }) : ''}
-        ${s.mode === 'coach' ? tile({ icon: 'target', label: 'Coach code', sub: UI.esc(s.profile.coachCode || '—') }) : ''}
-        ${tile({ act: 'install-app', icon: 'download', label: 'Install app' })}
+        ${mode === 'agent' ? tile({ act: 'nav:goals', icon: 'flag', label: 'Goals' }) : ''}
+        ${mode === 'agent' ? tile({ id: 'm-inbox', icon: 'inbox', label: 'Messages' }) : ''}
         ${tile({ act: 'export-ics', icon: 'calendar', label: 'Calendar' })}
+        ${Auth.isSuperuser() ? tile({ act: 'toggle-preview', icon: 'swap', label: 'Preview', sub: mode === 'coach' ? 'Coach' : 'Consultant' }) : ''}
+        ${tile({ act: 'open-settings', icon: 'settings', label: 'Settings' })}
+      </div>`);
+    if ($('m-inbox')) $('m-inbox').addEventListener('click', inboxSheet);
+  }
+  function openSettings() {
+    const s = S.get();
+    const mode = UI.effectiveMode(s);
+    UI.openSheet(`<h3>Settings</h3>
+      <div class="tile-grid">
+        ${tile({ id: 'm-theme', icon: s.settings.theme === 'light' ? 'sun' : 'moon', label: 'Appearance', sub: s.settings.theme === 'light' ? 'Light' : 'Dark' })}
+        ${tile({ id: 'm-reminders', icon: 'bell', label: 'Reminders', sub: s.settings.remindersEnabled ? 'On' : 'Off' })}
+        ${mode === 'agent' ? tile({ id: 'm-coachcode', icon: 'target', label: 'Coach', sub: s.profile.coachId ? UI.esc(s.profile.coachName) : 'Not linked' }) : ''}
+        ${mode === 'coach' ? tile({ icon: 'target', label: 'Coach code', sub: UI.esc(s.profile.coachCode || '—') }) : ''}
+        ${tile({ act: 'install-app', icon: 'download', label: 'Install app' })}
         ${tile({ href: 'privacy.html', icon: 'file', label: 'Privacy' })}
       </div>
       <div class="tile-grid" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--hairline-soft)">
         ${tile({ act: 'log-out', icon: 'logout', label: 'Log out' })}
         ${tile({ act: 'reset-app', icon: 'reset', label: 'Reset data', color: 'var(--clay)' })}
-      </div>`);
-    $('m-theme').addEventListener('click', () => { toggleTheme(); openMenu(); });
+      </div>
+      <button class="btn outline" data-act="open-menu" style="width:100%;margin-top:12px">‹ Back to menu</button>`);
+    $('m-theme').addEventListener('click', () => { toggleTheme(); openSettings(); });
     $('m-reminders').addEventListener('click', remindersSheet);
     if ($('m-coachcode')) $('m-coachcode').addEventListener('click', linkCoachSheet);
-    if ($('m-inbox')) $('m-inbox').addEventListener('click', inboxSheet);
   }
   function linkCoachSheet() {
     const s = S.get();

@@ -78,10 +78,12 @@ Follow-up polish requested directly after the initial Tracker rebuild — record
 
 ## Menu / Settings
 
-- [ ] Hide items not needed for MVP
-- [ ] Keep: Goals, Messages, Calendar
-- [ ] Add two-way calendar sync, with reconnect alerts if sync breaks
-- [ ] Add two reminders (not just one)
+- [x] Hide items not needed for MVP — split into two levels: the main Menu sheet now shows only Goals, Messages, Calendar (+ Preview for superusers), and everything else (Appearance, Reminders, Coach link, Install app, Privacy, Log out, Reset data) moved into a new Settings tile/screen one tap away
+- [x] Keep: Goals, Messages, Calendar
+- [ ] Add two-way calendar sync, with reconnect alerts if sync breaks — scoping needed, see note below; current "Calendar" tile is still the one-way .ics export, not real sync
+- [x] Add two reminders (not just one) — already existed (morning + end-of-day), just relocated into Settings
+
+Fixed in passing: the menu was reading the account's real role (`s.mode`) instead of the superuser preview override (`UI.effectiveMode`), so a tester previewing as Consultant was seeing the Coach's menu items. Now uses the same helper as the rest of the app.
 
 ## Notifications strategy
 
