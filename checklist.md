@@ -20,16 +20,30 @@ Goal: strip the app down to a simple "tick, tick, tick" daily-tracking MVP. Cut 
 - [x] Replace current activity view with the Activity Funnel
 - [ ] ~~Funnel views: Weekly / Monthly / Quarterly (+ YTD)~~ — unified with the system-wide filter below instead of a separate set; flag if Quarterly specifically is still wanted alongside it
 - [x] System-wide time filters standardized to: **Today, Week to Date, Month to Date, Year to Date**
-- [x] Small Goals section at the bottom of the page
+- [ ] ~~Small Goals section at the bottom of the page~~ — added, then removed at the user's request; Goals is still reachable from the menu, just not previewed on the Tracker page anymore
 - [x] Remove AI-generated copy (e.g. "Calls are your biggest gap…") — that's the coach's job, not the app's
 - [x] Disable Auto Nudge (no AI API key — avoid the added complexity)
 - [x] Disable Predictive Plan
 - [x] Remove Copy and PDF actions from the old Reports card (superseded by "Generate report," below)
 - [x] Remove "Areas to improve" section
 
+## Tracker page refinements (user-directed, not from the original meeting)
+
+Follow-up polish requested directly after the initial Tracker rebuild — recorded here so this file stays the accurate single source of truth for the page's current state.
+
+- [x] Removed the "Your goals" preview card from the Tracker page (see note above — Goals still lives in the menu)
+- [x] Moved Today's focus to directly under the Activity Funnel
+- [x] Activity Funnel's title is now dynamic per selected period: Daily / Weekly / Monthly / Yearly Funnel
+- [x] Outcomes is its own bar-chart widget, not a plain list
+- [x] Outcomes bars are themselves the "tap to add" control (removed the separate tag row from the numbers card)
+- [x] Conversion funnel is now an actual funnel visual — cumulative retention %, single gold hue fading toward the narrow end, deliberately distinct from the Activity Funnel's per-stage red/orange/green
+- [x] More spacing between "Log today's numbers" and the period tabs below it
+- [x] Central mic button now opens a choice (record a voice note / write a summary) instead of jumping straight to recording; fixed the icon not being centered in the circle
+- [x] Removed em dashes from the Tracker page's visible copy
+
 ## Reports (moves into Tracker, no longer its own tab)
 
-- [ ] Remove the standalone Reports tab
+- [x] Remove the standalone Reports tab
 - [ ] Add a **"Generate report"** button on the Tracker page
   - [ ] Pulls data for whatever time period is currently selected (e.g. "This Week")
   - [ ] Outputs a PDF
@@ -43,8 +57,8 @@ Goal: strip the app down to a simple "tick, tick, tick" daily-tracking MVP. Cut 
 
 ## Pipeline page
 
-- [ ] Remove the Database section
-- [ ] Update "Add Client" to capture business name and other details
+- [x] Remove the Database section
+- [x] Update "Add Client" to capture business name and other details — business name, phone, email added; **needs migration `0007_pipeline_business_details.sql` run in the Supabase SQL editor** before these fields sync to the cloud
 
 ## Voice Log / Recorder
 
