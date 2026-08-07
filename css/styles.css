@@ -255,12 +255,13 @@ svg{display:block}
 
 /* ---------- Bars chart ---------- */
 .bars{display:flex;align-items:flex-end;gap:12px;height:120px;margin-top:10px}
-.bars .bar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
+.bars .bar{flex:1;display:flex;flex-direction:column;align-items:center;height:100%}
+.bars .bar .track{flex:1;min-height:0;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end}
 .bars .bar .col{width:100%;max-width:28px;background:var(--gold);border-radius:2px 2px 0 0;transition:height .4s;position:relative}
 .bars .bar .col.under{background:var(--clay)}
 .bars .bar .col.over{background:var(--gold)}
 .bars .bar .n{font-family:var(--mono);font-size:11px;color:var(--bone-faint);margin-bottom:6px}
-.bars .bar .lbl{font-size:10.5px;color:var(--bone-faint);margin-top:8px}
+.bars .bar .lbl{flex:0 0 auto;font-size:10.5px;line-height:1.25;color:var(--bone-faint);margin-top:8px;height:calc(10.5px * 1.25 * 2);overflow:hidden}
 
 /* ---------- Sales funnel — a continuous tapering silhouette (shape
    column, clip-path trapezoids sharing edges between stages) paired

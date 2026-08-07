@@ -563,7 +563,7 @@
         ${outs.map((o) => {
           const val = agg.outcomes[o.key].actual;
           const h = Math.round((val / max) * 100);
-          return `<div class="bar" data-act="outcome:${o.key}" style="cursor:pointer"><div class="n">${val}</div><div class="col" style="height:${Math.max(6, h)}%;background:${o.bad ? 'var(--clay)' : 'var(--gold)'}"></div><div class="lbl">${esc(o.label)}</div></div>`;
+          return `<div class="bar" data-act="outcome:${o.key}" style="cursor:pointer"><div class="track"><div class="n">${val}</div><div class="col" style="height:${Math.max(6, h)}%;background:${o.bad ? 'var(--clay)' : 'var(--gold)'}"></div></div><div class="lbl">${esc(o.label)}</div></div>`;
         }).join('')}
       </div>
       <p class="subtle" style="margin:10px 0 0;text-align:center">Updates automatically as deals move stage. Tap a bar to correct one.</p>
