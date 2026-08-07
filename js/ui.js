@@ -293,10 +293,20 @@
   const AGENT_TITLES = { today: 'Tracker', pipeline: 'Pipeline', goals: 'Goals' };
   const COACH_TITLES = { dashboard: 'Coach Dashboard', clients: 'Clients', alerts: 'Alerts' };
 
+  // Superuser preview — lets an allowlisted tester flip which UI renders
+  // without touching the account's real role in the database (see
+  // Auth.isSuperuser). Everything below reads this instead of s.mode
+  // directly wherever the choice is about what to RENDER; s.mode itself
+  // stays the source of truth for what the account actually is (sync.js's
+  // refreshRoster() still checks the real s.mode, not this).
+  function effectiveMode(s) {
+    return (global.Auth && Auth.isSuperuser() && s.previewMode) ? s.previewMode : s.mode;
+  }
+
   function renderTopbar() {
-    const s = S.get();
-    const title = s.mode === 'coach' ? COACH_TITLES[coachView] : AGENT_TITLES[current];
-    const sub = s.mode === 'coach'
+    const s = S.get(); const mode = effectiveMode(s);
+    const title = mode === 'coach' ? COACH_TITLES[coachView] : AGENT_TITLES[current];
+    const sub = mode === 'coach'
       ? esc(s.profile.name) + (s.profile.brand ? ' · ' + esc(s.profile.brand) : ' · Head Coach')
       : Data.vertical().label + ' · ' + esc(s.profile.name);
     $('topbar').innerHTML = `<div class="topbar">
@@ -313,7 +323,7 @@
   function renderNav() {
     const s = S.get();
     const nav = $('bottomnav');
-    if (s.mode === 'coach') {
+    if (effectiveMode(s) === 'coach') {
       const items = [['dashboard', 'grid', 'Dashboard'], ['clients', 'users', 'Clients'], ['alerts', 'bell', 'Alerts']];
       const alertN = (s.demoAlerts || []).filter((a) => a.tone === 'red' || a.tone === 'amber').length;
       nav.innerHTML = items.map(([k, ic, l]) =>
@@ -346,9 +356,10 @@
     $('onboarding').style.display = 'none'; $('main').style.display = 'block';
     renderTopbar(); renderNav();
     const host = $('views');
-    if (s.mode === 'coach') host.innerHTML = coachScreen();
+    const mode = effectiveMode(s);
+    if (mode === 'coach') host.innerHTML = coachScreen();
     else host.innerHTML = agentScreen();
-    const viewKey = s.mode + ':' + (s.mode === 'coach' ? coachView : current);
+    const viewKey = mode + ':' + (mode === 'coach' ? coachView : current);
     if (viewKey !== lastRenderedView) {
       window.scrollTo({ top: 0 });
     } else {
@@ -779,6 +790,6 @@
     get clientStatusFilter() { return clientStatusFilter; }, set clientStatusFilter(v) { clientStatusFilter = v; },
     get clientSort() { return clientSort; }, set clientSort(v) { clientSort = v; },
     get onbTmp() { return onbTmp; },
-    captureOnb, finishOnboarding, clearOnbDraft, initials, esc, money, sparkline,
+    captureOnb, finishOnboarding, clearOnbDraft, initials, esc, money, sparkline, effectiveMode,
   };
 })(window);

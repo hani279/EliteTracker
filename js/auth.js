@@ -96,6 +96,16 @@
 
   function getSession() { return cachedSession; }
 
+  // Testers who can flip between the consultant and coach UI on their own
+  // account (ui.js's effectiveMode) without that being a real role change.
+  // Hardcoded rather than a DB flag — nobody outside this list should ever
+  // see the toggle, and it's a one-line edit to add or remove a tester.
+  const SUPERUSER_EMAILS = ['tester@captur.com.au'];
+  function isSuperuser() {
+    const session = cachedSession;
+    return !!(session && session.email && SUPERUSER_EMAILS.includes(session.email.toLowerCase()));
+  }
+
   async function signUpEmail(name, email, password) {
     const c = client();
     if (!c) { const r = mockSignUpEmail(name, email, password); notify(); return r; }
@@ -217,6 +227,6 @@
   global.Auth = {
     init, getSession, onChange,
     signUpEmail, signInEmail, signInGoogle, signOut,
-    isGoogleConfigured, syncProfile, findCoachByCode, linkCoach,
+    isGoogleConfigured, syncProfile, findCoachByCode, linkCoach, isSuperuser,
   };
 })(window);

@@ -25,6 +25,15 @@
     s.settings.theme = s.settings.theme === 'light' ? 'dark' : 'light';
     S.save(); applyTheme(s.settings.theme); rerender();
   }
+  // Superuser-only: flips which UI renders (consultant vs coach) without
+  // touching the account's real role — see UI.effectiveMode / Auth.isSuperuser.
+  function togglePreview() {
+    const s = S.get();
+    s.previewMode = UI.effectiveMode(s) === 'coach' ? 'agent' : 'coach';
+    S.save(); UI.current = 'today'; UI.coachView = 'dashboard';
+    UI.closeSheet(); rerender();
+    UI.toast('Previewing ' + (s.previewMode === 'coach' ? 'Coach' : 'Consultant'));
+  }
 
   /* ---------- init ---------- */
   S.load();
@@ -114,6 +123,7 @@
     if (cmd === 'nav') { UI.current = a; rerender(); return; }
     if (cmd === 'cnav') { UI.coachView = a; rerender(); return; }
     if (cmd === 'toggle-theme') return toggleTheme();
+    if (cmd === 'toggle-preview') return togglePreview();
 
     // ---- menu ----
     if (cmd === 'open-menu') return openMenu();
@@ -766,6 +776,7 @@
       ${session ? `<p class="subtle" style="margin:-8px 0 16px">Signed in as ${UI.esc(session.email)}${session.provider === 'google' ? ' · Google' : ''}</p>` : ''}
       <div class="tile-grid">
         ${tile({ id: 'm-theme', icon: s.settings.theme === 'light' ? 'sun' : 'moon', label: 'Appearance', sub: s.settings.theme === 'light' ? 'Light' : 'Dark' })}
+        ${Auth.isSuperuser() ? tile({ act: 'toggle-preview', icon: 'swap', label: 'Preview', sub: UI.effectiveMode(s) === 'coach' ? 'Coach' : 'Consultant' }) : ''}
         ${s.mode === 'agent' ? tile({ act: 'nav:goals', icon: 'flag', label: 'Goals' }) : ''}
         ${s.mode === 'agent' ? tile({ id: 'm-inbox', icon: 'inbox', label: 'Messages' }) : ''}
         ${tile({ id: 'm-reminders', icon: 'bell', label: 'Reminders', sub: s.settings.remindersEnabled ? 'On' : 'Off' })}

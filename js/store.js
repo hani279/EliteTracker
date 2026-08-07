@@ -25,7 +25,8 @@
     return {
       version: 1,
       onboarded: false,
-      mode: 'agent',            // 'agent' | 'coach'
+      mode: 'agent',            // 'agent' | 'coach' — the account's real role
+      previewMode: null,        // 'agent' | 'coach' | null — superuser-only UI override, see Auth.isSuperuser
       profile: { name: '', coachName: '', coachCode: '', coachId: '', brand: '', vertical: 'realestate', role: '' },
       buildFramework: { goal: '', proof: '', steps: [] }, // Goal / Proof / Steps — build best agent
       goals: [],                // life & business goals grid
