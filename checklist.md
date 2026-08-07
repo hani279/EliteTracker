@@ -34,8 +34,8 @@ Follow-up polish requested directly after the initial Tracker rebuild — record
 - [x] Removed the "Your goals" preview card from the Tracker page (see note above — Goals still lives in the menu)
 - [x] Moved Today's focus to directly under the Activity Funnel
 - [x] Activity Funnel's title is now dynamic per selected period: Daily / Weekly / Monthly / Yearly Funnel
-- [x] Outcomes is its own bar-chart widget, not a plain list
-- [x] Outcomes bars are themselves the "tap to add" control (removed the separate tag row from the numbers card)
+- [x] ~~Outcomes is its own bar-chart widget, not a plain list~~ — superseded below: it moved off the Tracker page entirely, onto Pipeline
+- [x] Outcomes bars are themselves the "tap to add" control (removed the separate tag row from the numbers card) — now a manual-correction fallback; see Pipeline link below
 - [x] Conversion funnel is now an actual funnel visual — cumulative retention %, single gold hue fading toward the narrow end, deliberately distinct from the Activity Funnel's per-stage red/orange/green
 - [x] More spacing between "Log today's numbers" and the period tabs below it
 - [x] Central mic button now opens a choice (record a voice note / write a summary) instead of jumping straight to recording; fixed the icon not being centered in the circle
@@ -59,6 +59,7 @@ Follow-up polish requested directly after the initial Tracker rebuild — record
 
 - [x] Remove the Database section
 - [x] Update "Add Client" to capture business name and other details — business name, phone, email added; **needs migration `0007_pipeline_business_details.sql` run in the Supabase SQL editor** before these fields sync to the cloud
+- [x] Outcomes moved here from Tracker and linked to real pipeline actions instead of a disconnected manual counter — a new item counts as "added to pipeline", and moving a deal to a vertical's trigger stage (real estate: Listed/Sold/Lost, sales: Demo/Proposal/Won/Lost — added a "Lost" stage to both) writes the matching outcome automatically. Manual tap on a bar still works as a correction fallback.
 
 ## Voice Log / Recorder
 
