@@ -74,10 +74,10 @@ Follow-up polish requested directly after the initial Tracker rebuild — record
 
 ## Voice Log / Recorder
 
-- [ ] **Bug: recordings aren't saving** — root cause is a missing storage API
-- [ ] Build a proper storage API for recordings
-- [ ] Show recordings in the coach dashboard
-- [ ] Priority: after the Tracker MVP ships, not before
+- [ ] **Bug: recordings aren't saving** — confirmed root cause by querying the live database directly: `supabase/migrations/0002_voice_notes_storage.sql` was written months ago but **never actually run** against the live project. The `voice-notes` Storage bucket doesn't exist there (`upload()` returns "Bucket not found") and the `voice_notes` table still has its old pre-migration shape (no `day` column). Recordings save fine locally (IndexedDB) so they play back on the same device, but silently never leave it — no cloud backup, no coach visibility, gone if the browser data is cleared. **Action needed: run `0002_voice_notes_storage.sql` in the Supabase SQL editor** (same as `0007`, above) — everything else below is already built and waiting on it.
+- [x] Build a proper storage API for recordings — the API itself already existed (`uploadVoiceNote` in app.js, `voice-notes` bucket + RLS in the migration); what was actually missing was resilience. Added: automatic retry for any voice note that finished recording but never made it to storage (runs at boot/login and on regaining connectivity, not just once at record-time), and a "Not backed up yet" tag in the voice notes list so a stuck upload is visible instead of silently swallowed.
+- [x] Show recordings in the coach dashboard — a client's sheet (tap a consultant from Clients) now has a "Voice notes" section listing their recent recordings with playback, using the existing coach-read RLS policy + a short-lived signed URL (the storage bucket is private)
+- [x] Priority: after the Tracker MVP ships, not before — the Tracker MVP has shipped; this was picked up next as requested
 
 ## Menu / Settings
 

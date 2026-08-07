@@ -44,10 +44,12 @@
   async function boot() {
     if (booted) return; booted = true;
     await Auth.init();
-    Auth.onChange(async () => { await syncForSession(); UI.render(); });
+    Auth.onChange(async () => { await syncForSession(); UI.render(); retryVoiceUploads(); });
     await syncForSession();
     UI.render();
     scheduleReminders();
+    retryVoiceUploads();
+    window.addEventListener('online', retryVoiceUploads);
     if ('Notification' in window && Notification.permission === 'granted' && global.Push) Push.subscribe();
   }
 
@@ -163,6 +165,7 @@
     if (cmd === 'rec-stop') return stopRecording();
     if (cmd === 'vn-play') return playVoice(a);
     if (cmd === 'vn-del') return delVoice(a);
+    if (cmd === 'cc-vn-play') return playCoachVoiceNote(a);
 
     // ---- tracker ----
     if (cmd === 'tracker-period') { UI.trackerPeriod = a; rerender(); return; }
@@ -375,9 +378,30 @@
     if (!d.voiceNotes.length) return '<p class="subtle">No voice notes yet.</p>';
     return d.voiceNotes.map((v) => `<div class="vn">
       <div class="play" data-act="vn-play:${v.id}">${Icons.svg('play', { size: 13 })}</div>
-      <div style="flex:1"><div style="font-weight:600;font-size:13px">Voice note</div>
+      <div style="flex:1"><div style="font-weight:600;font-size:13px">Voice note ${!v.storagePath ? '<span class="tag" style="margin-left:4px">Not backed up yet</span>' : ''}</div>
       <div class="subtle" style="font-size:11px">${new Date(v.ts).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' })} · ${v.durationSec || 0}s</div></div>
       <button class="tag red" data-act="vn-del:${v.id}">Delete</button></div>`).join('');
+  }
+  // Retries any voice note that finished recording (safe in IndexedDB)
+  // but never made it to cloud storage — a failed uploadVoiceNote()
+  // call (bad network, bucket briefly unavailable) previously had no
+  // second attempt: storagePath just stayed unset forever, which also
+  // silently kept it out of every sync.js push() (see push()'s comment
+  // on voiceNotes). Runs at boot/login and on regaining connectivity;
+  // safe to call anytime since it's a no-op for already-uploaded notes.
+  async function retryVoiceUploads() {
+    const s = S.get();
+    let any = false;
+    for (const day of Object.keys(s.days || {})) {
+      for (const v of (s.days[day].voiceNotes || [])) {
+        if (v.storagePath) continue;
+        const blob = await S.getAudio(v.id);
+        if (!blob) continue; // deleted locally some other way — nothing to retry
+        any = true;
+        await uploadVoiceNote(v.id, blob);
+      }
+    }
+    if (any) { const list = $('vn-list'); if (list) list.innerHTML = voiceListHtml(S.dayRecord()); }
   }
   function wireVoiceList() {
     // handled by global delegation (vn-play / vn-del / rec-start)
@@ -667,7 +691,9 @@
       <button class="btn outline" id="cc-report" style="margin-top:10px;width:100%">${Icons.svg('file', { size: 15 })} Send daily report</button>
       <div class="field" style="margin-top:16px;margin-bottom:0"><label>Private notes — only you see this</label>
         <textarea class="textarea" id="cc-note" placeholder="Loading…" style="min-height:80px"></textarea></div>
-      <button class="btn outline sm" id="cc-note-save" style="margin-top:8px">Save note</button>`);
+      <button class="btn outline sm" id="cc-note-save" style="margin-top:8px">Save note</button>
+      <div class="section-title" style="margin-top:20px">Voice notes</div>
+      <div id="cc-voice-list"><p class="subtle">Loading…</p></div>`);
     $('cc-msg').addEventListener('click', () => sendNudge(c));
     $('cc-report').addEventListener('click', () => dailyReportSheet(c));
     Sync.fetchSentReports(id).then((reports) => {
@@ -688,6 +714,20 @@
       btn.removeAttribute('disabled'); btn.textContent = 'Save note';
       UI.toast(r.error ? 'Could not save — ' + r.error : 'Note saved');
     });
+    Sync.fetchAgentVoiceNotes(id).then((notes) => {
+      const el = $('cc-voice-list'); // sheet may have closed already — guard
+      if (!el) return;
+      el.innerHTML = notes.length ? notes.map((v) => `<div class="vn">
+        <div class="play" data-act="cc-vn-play:${UI.esc(v.storage_path)}">${Icons.svg('play', { size: 13 })}</div>
+        <div style="flex:1"><div style="font-weight:600;font-size:13px">Voice note</div>
+        <div class="subtle" style="font-size:11px">${new Date(v.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })} · ${v.duration_sec || 0}s</div></div>
+      </div>`).join('') : '<p class="subtle">No voice notes yet.</p>';
+    });
+  }
+  async function playCoachVoiceNote(storagePath) {
+    const url = await Sync.getVoiceNoteSignedUrl(storagePath);
+    if (!url) { UI.toast('Could not load audio'); return; }
+    new Audio(url).play();
   }
   function buildDailyReportDraft(c) {
     return `Hi ${c.name.split(' ')[0]} — here's your daily rundown.\n\n`

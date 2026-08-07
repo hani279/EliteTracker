@@ -391,5 +391,30 @@
     return { ok: true };
   }
 
-  global.Sync = { push, pull, refreshRoster, sendCoachMessage, fetchInbox, markMessageRead, fetchSentReports, fetchCoachNote, saveCoachNote };
+  // ---------- coach: read an agent's voice notes ----------
+  // Relies on the existing "coach reads linked agent voice_notes" RLS
+  // policy (0001_init.sql) — no new table policy needed. The audio
+  // itself lives in a private bucket, so playback needs a short-lived
+  // signed URL rather than a public one; see getVoiceNoteSignedUrl.
+  async function fetchAgentVoiceNotes(agentId) {
+    const c = client(); const session = global.Auth && Auth.getSession();
+    if (!c || !session) return [];
+    const { data, error } = await c.from('voice_notes')
+      .select('id, day, storage_path, duration_sec, created_at')
+      .eq('profile_id', agentId).order('created_at', { ascending: false }).limit(30);
+    if (error) { console.warn('fetch agent voice notes failed', error); return []; }
+    return data || [];
+  }
+  async function getVoiceNoteSignedUrl(storagePath) {
+    const c = client();
+    if (!c) return null;
+    const { data, error } = await c.storage.from('voice-notes').createSignedUrl(storagePath, 60);
+    if (error) { console.warn('signed url failed', error); return null; }
+    return data && data.signedUrl;
+  }
+
+  global.Sync = {
+    push, pull, refreshRoster, sendCoachMessage, fetchInbox, markMessageRead, fetchSentReports, fetchCoachNote, saveCoachNote,
+    fetchAgentVoiceNotes, getVoiceNoteSignedUrl,
+  };
 })(window);
