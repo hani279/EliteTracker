@@ -62,8 +62,9 @@ Follow-up polish requested directly after the initial Tracker rebuild — record
 
 ## Automated daily coach summary
 
-- [ ] Replace per-client, per-time report sends with **one compiled PDF covering all clients**
-- [ ] Email it to the coach automatically, once a day, at a set time (~10–11pm)
+- [x] Replace per-client, per-time report sends with **one compiled PDF covering all clients** — new `send-daily-coach-summaries` Edge Function, one PDF per coach covering every linked agent
+- [x] Email it to the coach automatically, once a day, at a set time (~10–11pm) — via Resend, triggered by `pg_cron`; see `supabase/migrations/0008_daily_coach_summary_cron.sql` and BACKEND_SETUP.md §8 for the (several) manual setup steps this needs — a Resend account/API key, a Vault secret, and a `supabase functions deploy`
+  - Written but **not yet deployed or sent a real test email** — needs the setup steps above run by hand before it does anything
 
 ## Pipeline page
 

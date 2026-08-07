@@ -157,7 +157,58 @@ into background push too would mean the function running on a timer
 against every user's own local time zone, which is a bigger lift than
 "coach taps a button right now." Worth doing later if it matters enough.
 
-## 8. Sanity check
+## 8. Automated daily coach summary emails
+
+Once a day, every coach gets one email with a PDF covering all of their
+agents' activity for the day — replacing one-off per-client sends. This
+needs three things none of the earlier steps do: a transactional email
+provider, a scheduled trigger (not a person clicking a button), and a
+non-user secret (the function has no signed-in caller to check a JWT
+against).
+
+1. **Create a [Resend](https://resend.com) account** (free tier is plenty
+   to start) and grab an API key from the dashboard. If you want the
+   "from" address to be `reports@yourdomain.com` rather than Resend's
+   shared test domain, verify that domain in Resend first (a few DNS
+   records) — otherwise just use their default sender for now and switch
+   later.
+2. **Run the migration** — paste
+   [`supabase/migrations/0008_daily_coach_summary_cron.sql`](supabase/migrations/0008_daily_coach_summary_cron.sql)
+   into the SQL Editor. Read its comment block first: it needs two
+   `vault.create_secret(...)` calls run *before* it (not part of the
+   migration itself, since those values are secrets and this file is
+   committed to git) — the function's URL and a random cron secret you
+   generate yourself, e.g. `openssl rand -hex 24`.
+3. **Set the function's secrets** — the cron secret must be the exact
+   same value you just put in Vault:
+   ```
+   npx supabase secrets set CRON_SECRET=<same value as vault's daily_summary_cron_secret>
+   npx supabase secrets set RESEND_API_KEY=<your Resend API key>
+   npx supabase secrets set RESEND_FROM="ELITE Tracker <reports@yourdomain.com>"
+   ```
+4. **Deploy the function** — this one skips Supabase's usual JWT check
+   since pg_cron has no user session to present:
+   ```
+   npx supabase functions deploy send-daily-coach-summaries --no-verify-jwt
+   ```
+5. **Test it without waiting for the schedule** — call it directly with
+   the same secret header pg_cron will send:
+   ```
+   curl -X POST https://qvxorxlfmsgtazrfxsnj.supabase.co/functions/v1/send-daily-coach-summaries \
+     -H "x-cron-secret: <your CRON_SECRET>"
+   ```
+   A coach with at least one linked agent should get an email within a
+   few seconds. The response body lists what happened per coach (sent,
+   skipped-no-agents, skipped-no-email, or an error) — useful for
+   confirming without digging through logs.
+
+By default this fires at 11:00 UTC (9pm AEST / 10pm AEDT — see the
+migration's comment for the daylight-saving tradeoff and how to change
+it). This whole feature is new and untested against a live send — the
+`curl` step above is how to verify it actually works before trusting the
+schedule.
+
+## 9. Sanity check
 
 1. Sign up as a coach → check **Table Editor → profiles** for a new row with
    `role = 'coach'` and a generated `coach_code`.
