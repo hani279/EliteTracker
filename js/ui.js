@@ -443,7 +443,7 @@
         </div>
       </div>
 
-      ${conversionFunnelCard(conv)}
+      ${conversionCard(conv)}
 
       ${twoWeekFocusCard()}
 
@@ -570,35 +570,26 @@
     </div>`;
   }
 
-  // Conversion funnel — a second funnel visual, deliberately styled
-  // differently from the Activity Funnel above so the two aren't
-  // mistaken for each other: single gold hue fading toward the narrow
-  // end (vs. the Activity Funnel's per-stage red/orange/green), and
-  // width here is cumulative retention from the first stage rather
-  // than raw counts.
-  function conversionFunnelCard(conv) {
-    if (!conv.length) return `<div class="card"><h3>Conversion Funnel</h3><p class="subtle" style="margin:0">Log more to see conversions.</p></div>`;
+  // Conversion — cumulative retention from the first stage, shown as
+  // plain progress rows (same visual language as "Log today's numbers"
+  // above: label, thin R/O/G fill bar, value) rather than a second
+  // funnel shape, which read as a confusing near-duplicate of the
+  // Activity Funnel above it.
+  function conversionCard(conv) {
+    if (!conv.length) return `<div class="card"><h3>Conversion</h3><p class="subtle" style="margin:0">Log more to see conversions.</p></div>`;
     const stages = [{ label: conv[0].from, cum: 1 }];
     let cum = 1;
     conv.forEach((c) => { cum *= c.rate; stages.push({ label: c.to, cum }); });
-    const widths = stages.map((s) => Math.max(10, Math.round(s.cum * 100)));
     return `<div class="card">
-      <h3>Conversion Funnel</h3>
-      <div class="funnel3">
-        <div class="funnel3-shape">
-          ${stages.map((s, i) => {
-            const top = widths[i], bottom = i < stages.length - 1 ? widths[i + 1] : widths[i];
-            const shade = (1 - (i / Math.max(1, stages.length - 1)) * 0.6).toFixed(2);
-            return `<div class="funnel3-seg" style="opacity:${shade};clip-path:${funnelClip(top, bottom)}"></div>`;
-          }).join('')}
-        </div>
-        <div class="funnel3-legend">
-          ${stages.map((s) => `<div class="funnel3-row">
-            <span class="funnel3-label">${esc(s.label)}</span>
-            <span class="funnel3-pct">${Math.round(s.cum * 100)}%</span>
-          </div>`).join('')}
-        </div>
-      </div>
+      <h3>Conversion</h3>
+      ${stages.map((s) => {
+        const pct = Math.round(s.cum * 100);
+        return `<div class="num-row">
+          <div class="label"><div class="l">${esc(s.label)}</div>
+            <div class="track"><div class="fill" style="width:${pct}%;background:${paceColor(pct)}"></div></div></div>
+          <div class="stepper"><div class="val" style="color:${paceColor(pct)}">${pct}%</div></div>
+        </div>`;
+      }).join('')}
     </div>`;
   }
 

@@ -276,20 +276,6 @@ svg{display:block}
 .funnel2-count{font-family:var(--mono);font-size:13px;color:var(--bone-faint)}
 .funnel2-pace{font-family:var(--mono);font-weight:600;font-size:12px;min-width:36px;text-align:right}
 
-/* ---------- Conversion funnel — same tapering-silhouette technique as
-   the Activity Funnel above, deliberately styled differently so the two
-   read as distinct: single gold hue fading toward the narrow end
-   instead of per-stage traffic-light color, plain label+% legend
-   instead of dot+count+pace ---------- */
-.funnel3{display:flex;gap:16px;margin-top:14px}
-.funnel3-shape{flex:0 0 34%;display:flex;flex-direction:column}
-.funnel3-seg{height:44px;background:var(--gold);transition:clip-path .4s,opacity .3s}
-.funnel3-legend{flex:1;min-width:0;display:flex;flex-direction:column}
-.funnel3-row{height:44px;display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px solid var(--hairline-soft)}
-.funnel3-row:last-child{border-bottom:none}
-.funnel3-label{font-weight:500;color:var(--bone-muted);font-size:13px}
-.funnel3-pct{font-family:var(--mono);font-weight:600;font-size:13px;color:var(--gold-ink)}
-
 /* ---------- Pipeline / list rows ---------- */
 .lrow{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--hairline-soft)}
 .lrow:last-child{border-bottom:none}
