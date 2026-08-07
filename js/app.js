@@ -423,6 +423,16 @@
   }
 
   /* ---------- pipeline forms ---------- */
+  // Writes one to today's count for a pipeline-driven signal — the key
+  // might belong to either outcomes (e.g. real estate's "propertySold")
+  // or activity (e.g. sales' "addedPipeline", which is a stepped daily
+  // number for that vertical, not an outcome). Check both defs rather
+  // than assuming, since the same key can mean either depending on vertical.
+  function recordPipelineSignal(key) {
+    const d = S.dayRecord();
+    if (Data.outcomeDefs().some((o) => o.key === key)) d.outcomes[key] = (d.outcomes[key] || 0) + 1;
+    else if (Data.activityDefs().some((a) => a.key === key)) d.numbers[key] = (d.numbers[key] || 0) + 1;
+  }
   function pipelineSheet(id) {
     const s = S.get(); const v = Data.vertical();
     const p = id ? s.pipeline.find((x) => x.id === id) : { name: '', businessName: '', phone: '', email: '', detail: '', stage: v.pipelineStages[0], value: 0, sellingMonth: '', stalled: false };
@@ -451,7 +461,18 @@
         value: +$('p-value').value || 0, sellingMonth: $('p-month').value.trim(), stalled, updated: Date.now(),
       };
       if (!obj.name) { UI.toast('Name required'); return; }
+      const prevStage = id ? p.stage : null;
       if (id) Object.assign(p, obj); else s.pipeline.unshift({ id: S.uid(), ...obj });
+      // The link: a brand-new item counts as "added to pipeline"; an
+      // existing item crossing into one of the vertical's trigger stages
+      // (Listed/Sold/Lost, or the sales equivalents) writes straight to
+      // today's outcomes. Comparing against the stage it had *before*
+      // this save keeps repeat edits from double-counting.
+      if (!id) recordPipelineSignal('addedPipeline');
+      else if (prevStage !== obj.stage) {
+        const outcomeKey = (v.stageOutcomes || {})[obj.stage];
+        if (outcomeKey) recordPipelineSignal(outcomeKey);
+      }
       UI.closeSheet(); rerender(); UI.toast('Saved');
     });
     if (id) $('p-del').addEventListener('click', () => { s.pipeline = s.pipeline.filter((x) => x.id !== id); UI.closeSheet(); rerender(); UI.toast('Removed'); });

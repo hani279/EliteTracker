@@ -433,8 +433,6 @@
 
       ${conversionFunnelCard(conv)}
 
-      ${outcomesChart(agg, trackerPeriod, day)}
-
       ${twoWeekFocusCard()}
 
       ${specialOpsCard()}
@@ -537,12 +535,13 @@
     </div>`;
   }
 
-  // Outcomes as its own chart widget — a simple bar chart (reusing the
-  // vertical-bar pattern already in styles.css) instead of a plain kv list,
-  // colored by whether the outcome is good (gold) or bad (clay). Each bar
-  // is itself the "tap to add" control now — clicking it opens the same
-  // increment sheet the old tag row used to (which operates on today's
-  // count regardless of which period the chart is currently showing).
+  // Outcomes lives on the Pipeline page now, not Tracker — these numbers
+  // are results tied to actual deals, so they belong next to the deals
+  // themselves. Mostly self-updating: moving a pipeline item to a
+  // vertical's trigger stage (see Data stageOutcomes) writes here
+  // automatically (recordPipelineSignal in app.js). Bars stay tappable
+  // as a manual fallback for corrections or outcomes that happen outside
+  // the pipeline entirely.
   function outcomesChart(agg, period) {
     const outs = Data.outcomeDefs();
     const max = Math.max(...outs.map((o) => agg.outcomes[o.key].actual), 1);
@@ -555,7 +554,7 @@
           return `<div class="bar" data-act="outcome:${o.key}" style="cursor:pointer"><div class="n">${val}</div><div class="col" style="height:${Math.max(6, h)}%;background:${o.bad ? 'var(--clay)' : 'var(--gold)'}"></div><div class="lbl">${esc(o.label)}</div></div>`;
         }).join('')}
       </div>
-      <p class="subtle" style="margin:10px 0 0;text-align:center">Tap a bar to log one.</p>
+      <p class="subtle" style="margin:10px 0 0;text-align:center">Updates automatically as deals move stage. Tap a bar to correct one.</p>
     </div>`;
   }
 
@@ -611,6 +610,7 @@
     const active = s.pipeline.filter((p) => !p.stalled).length;
     const stalled = s.pipeline.filter((p) => p.stalled).length;
     const val = s.pipeline.reduce((a, p) => a + (p.value || 0), 0);
+    const agg = Intel.aggregate(Intel.rangeKeysToDate('wtd'));
     return `<section class="screen active">
       <div class="stat3">
         <div class="s"><div class="v">${active}</div><div class="k">Active</div></div>
@@ -619,11 +619,13 @@
       </div>
       <div class="card">${s.pipeline.map((p) => pipeRow(p)).join('') || emptyState('No ' + v.pipelineNoun + 's yet.')}</div>
       <button class="btn gold" data-act="add-pipeline" style="margin-top:12px">${Icons.svg('plus', { size: 14 })} Add ${esc(v.pipelineNoun)}</button>
+
+      ${outcomesChart(agg, 'wtd')}
     </section>`;
   }
 
   function pipeRow(p, db) {
-    const tone = p.stalled ? 'red' : (/(sold|won|listed|listing)/i.test(p.stage) ? 'green' : '');
+    const tone = p.stalled || p.stage === 'Lost' ? 'red' : (/(sold|won|listed|listing)/i.test(p.stage) ? 'green' : '');
     const sub = p.businessName ? `${p.businessName} · ${p.detail || 'no detail'}` : (p.detail || '');
     return `<div class="lrow" data-act="edit-pipeline:${p.id}">
       <div class="mono">${initials(p.name)}</div>

@@ -28,7 +28,12 @@
       ],
       // funnel used for conversion + predictive suggestions
       funnel: ['calls', 'conversations', 'baps', 'maps', 'laps'],
-      pipelineStages: ['To appraise', 'Appraised', 'Listing soon', 'Listed', 'Under offer', 'Sold'],
+      pipelineStages: ['To appraise', 'Appraised', 'Listing soon', 'Listed', 'Under offer', 'Sold', 'Lost'],
+      // A pipeline item reaching one of these stages writes straight to
+      // today's outcomes — the "full link" between Pipeline and Outcomes,
+      // so marking something Sold is what produces "Property sold", not
+      // a separate manual tap. Keyed by exact stage string.
+      stageOutcomes: { Listed: 'listingsWon', Sold: 'propertySold', Lost: 'clientsLost' },
       pipelineNoun: 'vendor',
       valueLabel: 'GCI / commission',
     },
@@ -50,7 +55,8 @@
         { key: 'churn',      label: 'Deals lost',       target: 0, bad: true },
       ],
       funnel: ['calls', 'conversations', 'mtgsBooked', 'mtgsSat', 'addedPipeline'],
-      pipelineStages: ['Prospect', 'Qualified', 'Demo', 'Proposal', 'Negotiation', 'Won'],
+      pipelineStages: ['Prospect', 'Qualified', 'Demo', 'Proposal', 'Negotiation', 'Won', 'Lost'],
+      stageOutcomes: { Demo: 'demos', Proposal: 'proposals', Won: 'dealsWon', Lost: 'churn' },
       pipelineNoun: 'deal',
       valueLabel: 'Deal value',
     },
