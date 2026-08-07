@@ -8,6 +8,10 @@ Goal: strip the app down to a simple "tick, tick, tick" daily-tracking MVP. Cut 
 
 - [x] Superuser preview toggle — an allowlisted tester account can flip between the consultant and coach UI from one login, without changing its real role. See `Auth.isSuperuser` / `SUPERUSER_EMAILS` in `js/auth.js`. Account: `tester@captur.com.au` (credentials shared separately).
 
+## Special Ops (user-directed, not from the original meeting)
+
+- [x] Add a way to delete a special op — there was previously no control for this at all (only individual checklist items could be toggled). Added an × button on each op's card, next to the title, deleting immediately with no confirmation (same convention as Pipeline's delete).
+
 ## Navigation
 
 - [x] Consolidate bottom nav to three tabs: **Tracker**, **Pipeline**, **Voice Log**

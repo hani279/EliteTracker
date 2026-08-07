@@ -639,7 +639,10 @@
 
   function specialOpCard(op) {
     const done = op.items.filter((i) => i.done).length;
-    return `<div class="card"><h3>${esc(op.title)} <span class="pill">${done}/${op.items.length}</span></h3>
+    return `<div class="card"><h3 style="display:flex;align-items:center;justify-content:space-between">
+        <span>${esc(op.title)} <span class="pill">${done}/${op.items.length}</span></span>
+        <button class="icon-btn" data-act="del-specialop:${op.id}" aria-label="Delete operation">${Icons.svg('close', { size: 15 })}</button>
+      </h3>
       <p class="subtle" style="margin:0 0 10px">${esc(op.description)}</p>
       ${op.items.map((i) => `<div class="focus-item ${i.done ? 'done' : ''}" data-act="specialop-item:${op.id}:${i.id}">
         <div class="check ${i.done ? 'done' : ''}">${i.done ? Icons.svg('check', { size: 12 }) : ''}</div><div class="txt">${esc(i.name)}</div></div>`).join('')}

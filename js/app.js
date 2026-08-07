@@ -173,6 +173,7 @@
     if (cmd === 'add-specialop') return specialOpSheet();
     if (cmd === 'specialop-item') { toggleOpItem(a, b); return; }
     if (cmd === 'specialop-add') return opItemSheet(a);
+    if (cmd === 'del-specialop') return deleteSpecialOp(a);
 
     // ---- crm ----
     // No UI currently calls these — the CRM tab was removed from nav (it's
@@ -527,6 +528,11 @@
   function toggleOpItem(opId, itemId) {
     const s = S.get(); const op = s.specialOps.find((o) => o.id === opId); if (!op) return;
     const it = op.items.find((i) => i.id === itemId); if (it) it.done = !it.done; rerender();
+  }
+  function deleteSpecialOp(opId) {
+    const s = S.get();
+    s.specialOps = s.specialOps.filter((o) => o.id !== opId);
+    rerender(); UI.toast('Operation removed');
   }
 
   /* ---------- CRM ---------- */
