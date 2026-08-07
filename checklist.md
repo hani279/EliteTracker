@@ -40,7 +40,7 @@ Follow-up polish requested directly after the initial Tracker rebuild — record
 - [x] Activity Funnel's title is now dynamic per selected period: Daily / Weekly / Monthly / Yearly Funnel
 - [x] ~~Outcomes is its own bar-chart widget, not a plain list~~ — superseded below: it moved off the Tracker page entirely, onto Pipeline
 - [x] Outcomes bars are themselves the "tap to add" control (removed the separate tag row from the numbers card) — now a manual-correction fallback; see Pipeline link below
-- [x] Conversion funnel is now an actual funnel visual — cumulative retention %, single gold hue fading toward the narrow end, deliberately distinct from the Activity Funnel's per-stage red/orange/green
+- [x] ~~Conversion funnel is now an actual funnel visual~~ — tried, but it read as a confusing duplicate of the Activity Funnel; replaced with plain R/O/G progress-bar rows (same style as "Log today's numbers"), same cumulative-retention data, no funnel shape
 - [x] More spacing between "Log today's numbers" and the period tabs below it
 - [x] Central mic button now opens a choice (record a voice note / write a summary) instead of jumping straight to recording; fixed the icon not being centered in the circle
 - [x] Removed em dashes from the Tracker page's visible copy
