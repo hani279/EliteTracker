@@ -451,7 +451,7 @@
 
       <div class="card">
         <h3>Daily summary</h3>
-        <p class="subtle" style="margin:0 0 10px">Captured via the mic button below, for you and ${esc(s.profile.coachName)}.</p>
+        <p class="subtle" style="margin:0 0 10px">Captured via the mic button below, for you${s.profile.coachName ? ` and ${esc(s.profile.coachName)}` : ''}.</p>
         ${day.voiceNotes.length ? `<div class="subtle">${day.voiceNotes.length} voice note(s) saved today.</div>` : ''}
         ${(day.summary.did || day.summary.learned || day.summary.struggled) ? `<div class="callout" style="margin-top:10px">${esc(day.summary.did || day.summary.learned || day.summary.struggled)}</div>` : ''}
         ${!day.voiceNotes.length && !(day.summary.did || day.summary.learned || day.summary.struggled) ? '<p class="subtle" style="margin:0">Nothing captured yet today.</p>' : ''}
