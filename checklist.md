@@ -6,26 +6,26 @@ Goal: strip the app down to a simple "tick, tick, tick" daily-tracking MVP. Cut 
 
 ## Navigation
 
-- [ ] Consolidate bottom nav to three tabs: **Tracker**, **Pipeline**, **Voice Log**
-- [ ] Voice Log is a central, prominent button (not a plain nav item) — encourage usage
-- [ ] Remove the CRM tab entirely
-- [ ] Fold "Today" dashboard into the Tracker page (no separate dashboard)
-- [ ] Fold Special Ops into the Tracker section
-- [ ] Remove the "Sales (non-real estate)" vertical header
+- [x] Consolidate bottom nav to three tabs: **Tracker**, **Pipeline**, **Voice Log**
+- [x] Voice Log is a central, prominent button (not a plain nav item) — encourage usage
+- [x] Remove the CRM tab entirely
+- [x] Fold "Today" dashboard into the Tracker page (no separate dashboard)
+- [x] Fold Special Ops into the Tracker section
+- [x] Remove the "Sales (non-real estate)" vertical header
 
 ## Tracker page (Today + Reports merged in)
 
-- [ ] "Log today's numbers" as a clear header/section
-- [ ] Color-coded progress bar per metric — Red / Orange / Green
-- [ ] Replace current activity view with the Activity Funnel
-- [ ] Funnel views: **Weekly / Monthly / Quarterly** (+ YTD)
-- [ ] System-wide time filters standardized to: **Today, Week to Date, Month to Date, Year to Date**
-- [ ] Small Goals section at the bottom of the page
-- [ ] Remove AI-generated copy (e.g. "Calls are your biggest gap…") — that's the coach's job, not the app's
-- [ ] Disable Auto Nudge (no AI API key — avoid the added complexity)
-- [ ] Disable Predictive Plan
-- [ ] Remove Copy and PDF actions from the old Reports card (superseded by "Generate report," below)
-- [ ] Remove "Areas to improve" section
+- [x] "Log today's numbers" as a clear header/section
+- [x] Color-coded progress bar per metric — Red / Orange / Green
+- [x] Replace current activity view with the Activity Funnel
+- [ ] ~~Funnel views: Weekly / Monthly / Quarterly (+ YTD)~~ — unified with the system-wide filter below instead of a separate set; flag if Quarterly specifically is still wanted alongside it
+- [x] System-wide time filters standardized to: **Today, Week to Date, Month to Date, Year to Date**
+- [x] Small Goals section at the bottom of the page
+- [x] Remove AI-generated copy (e.g. "Calls are your biggest gap…") — that's the coach's job, not the app's
+- [x] Disable Auto Nudge (no AI API key — avoid the added complexity)
+- [x] Disable Predictive Plan
+- [x] Remove Copy and PDF actions from the old Reports card (superseded by "Generate report," below)
+- [x] Remove "Areas to improve" section
 
 ## Reports (moves into Tracker, no longer its own tab)
 
