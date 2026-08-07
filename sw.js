@@ -7,8 +7,8 @@
    still read a stale browser-cached response for the same URL. Bumping
    the query string forces a genuinely new URL, which forces a real fetch.
    Bump both together on every deploy. */
-const CACHE = 'elite-tracker-v41';
-const V = '?v=41';
+const CACHE = 'elite-tracker-v42';
+const V = '?v=42';
 const ASSETS = [
   './',
   './index.html',

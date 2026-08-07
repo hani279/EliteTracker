@@ -134,6 +134,7 @@
     if (cmd === 'outcome') return outcomeSheet(a);
 
     // ---- summary / voice ----
+    if (cmd === 'daily-log') return dailyLogSheet();
     if (cmd === 'open-summary') return summarySheet();
     if (cmd === 'open-voice') return voiceSheet();
     if (cmd === 'rec-start') return startRecording();
@@ -145,7 +146,6 @@
     if (cmd === 'tracker-period') { UI.trackerPeriod = a; rerender(); return; }
 
     // ---- pipeline ----
-    if (cmd === 'pipe-tab') { UI.pipeTab = a; rerender(); return; }
     if (cmd === 'add-pipeline') return pipelineSheet(null);
     if (cmd === 'edit-pipeline') return pipelineSheet(a);
     if (cmd === 'add-specialop') return specialOpSheet();
@@ -304,6 +304,14 @@
       S.save();
       UI.closeSheet(); UI.render(); UI.toast('Day reviewed · daily report sent to ' + S.get().profile.coachName);
     });
+  }
+
+  /* ---------- daily log entry point (central mic button) ---------- */
+  function dailyLogSheet() {
+    UI.openSheet(`<h3>Daily log</h3>
+      <p class="subtle">Capture today in whichever way's fastest right now.</p>
+      <button class="choice icon-row" data-act="open-voice">${Icons.svg('mic', { size: 17 })}<span>Record a voice note</span></button>
+      <button class="choice icon-row" data-act="open-summary">${Icons.svg('edit', { size: 17 })}<span>Write a summary</span></button>`);
   }
 
   /* ---------- summary ---------- */
@@ -890,16 +898,6 @@
   }
 
   /* ---------- live-filter inputs (re-render without losing focus/cursor) ---------- */
-  function pipeSearch(value) {
-    UI.pipeSearch = value;
-    const active = document.activeElement;
-    const id = active && active.id;
-    const pos = active && active.selectionStart;
-    UI.render();
-    const el = id && $(id);
-    if (el) { el.focus(); if (pos != null) el.setSelectionRange(pos, pos); }
-  }
-
   function clientSearch(value) {
     UI.clientSearch = value;
     const active = document.activeElement;
@@ -939,5 +937,5 @@
   }
 
   // expose a few for debugging
-  global.App = { rerender, scheduleReminders, pipeSearch, coachCodeInput, clientSearch, clientSort };
+  global.App = { rerender, scheduleReminders, coachCodeInput, clientSearch, clientSort };
 })(window);

@@ -321,9 +321,9 @@ svg{display:block}
 
 /* Voice Log — a raised, central action rather than a plain tab, to
    encourage actually using the recorder instead of it hiding in a card. */
-.bottomnav .voicebtn{flex:0 0 auto;width:54px;height:54px;border-radius:50%;background:var(--gold);margin-top:-22px;box-shadow:var(--shadow-floating);border:3px solid var(--page-bg)}
-.bottomnav .voicebtn .ic{width:auto;height:auto}
-.bottomnav .voicebtn .ic svg{width:23px;height:23px;color:var(--ink)}
+.bottomnav .voicebtn{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0;gap:0;width:54px;height:54px;border-radius:50%;background:var(--gold);margin-top:-22px;box-shadow:var(--shadow-floating);border:3px solid var(--page-bg)}
+.bottomnav .voicebtn .ic{width:auto;height:auto;display:flex;align-items:center;justify-content:center}
+.bottomnav .voicebtn .ic svg{width:23px;height:23px;color:var(--ink);display:block}
 .bottomnav .voicebtn:active{background:var(--gold-dim)}
 
 /* ---------- Forms ---------- */

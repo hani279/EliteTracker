@@ -321,10 +321,11 @@
     } else {
       // Three tabs, with Voice Log as a raised, central action rather than
       // a plain nav item — it opens the recorder sheet directly (like the
-      // existing 'open-voice' trigger elsewhere), it doesn't route to a view.
+      // existing 'open-voice' trigger elsewhere), it doesn't route to a view
+      // — it opens a small choice between recording and writing.
       nav.innerHTML = `
         <button class="${current === 'today' ? 'on' : ''}" data-act="nav:today"><span class="ic">${Icons.svg('home')}</span>Tracker</button>
-        <button class="voicebtn" data-act="open-voice" aria-label="Record voice log"><span class="ic">${Icons.svg('mic', { size: 22 })}</span></button>
+        <button class="voicebtn" data-act="daily-log" aria-label="Record voice note or write a summary"><span class="ic">${Icons.svg('mic', { size: 22 })}</span></button>
         <button class="${current === 'pipeline' ? 'on' : ''}" data-act="nav:pipeline"><span class="ic">${Icons.svg('folder')}</span>Pipeline</button>`;
     }
   }
@@ -388,6 +389,7 @@
   // pass. No AI-generated copy, Auto Nudge, or Predictive Plan here
   // anymore — that read is the coach's job, not the app's.
   let trackerPeriod = 'wtd';
+  const FUNNEL_TITLES = { today: 'Daily Funnel', wtd: 'Weekly Funnel', mtd: 'Monthly Funnel', ytd: 'Yearly Funnel' };
   function viewToday() {
     const s = S.get(); const day = S.dayRecord(S.todayKey());
     const defs = Data.activityDefs();
@@ -416,19 +418,7 @@
 
       <div class="tabs">${periods.map(([k, l]) => `<button class="${trackerPeriod === k ? 'on' : ''}" data-act="tracker-period:${k}">${l}</button>`).join('')}</div>
 
-      ${salesFunnelCard(agg)}
-
-      <div class="card">
-        <div class="section-title">Conversion funnel</div>
-        ${conv.map((c) => `<div class="kv"><span class="k">${esc(c.from)} → ${esc(c.to)}</span><span class="v">${Math.round(c.rate * 100)}%</span></div>`).join('') || '<p class="subtle">Log more to see conversions.</p>'}
-      </div>
-
-      <div class="card">
-        <div class="section-title">Outcomes · ${Intel.rangeLabelToDate(trackerPeriod).toLowerCase()}</div>
-        ${Data.outcomeDefs().map((o) => `<div class="kv"><span class="k">${esc(o.label)}</span><span class="v" style="color:${o.bad ? 'var(--clay)' : 'var(--green)'}">${agg.outcomes[o.key].actual}</span></div>`).join('')}
-      </div>
-
-      ${twoWeekFocusCard()}
+      ${salesFunnelCard(agg, trackerPeriod)}
 
       <div class="card">
         <h3>Today's focus <span class="pill">${doneFocus}/${day.focus.length}</span>
@@ -446,19 +436,23 @@
         </div>
       </div>
 
+      <div class="card">
+        <div class="section-title">Conversion funnel</div>
+        ${conv.map((c) => `<div class="kv"><span class="k">${esc(c.from)} → ${esc(c.to)}</span><span class="v">${Math.round(c.rate * 100)}%</span></div>`).join('') || '<p class="subtle">Log more to see conversions.</p>'}
+      </div>
+
+      ${outcomesChart(agg, trackerPeriod)}
+
+      ${twoWeekFocusCard()}
+
       ${specialOpsCard()}
 
       <div class="card">
         <h3>Daily summary</h3>
-        <p class="subtle" style="margin:0 0 10px">What did you do, what did you learn, where did you struggle? Captured for you and ${esc(s.profile.coachName)}.</p>
-        <button class="btn outline" data-act="open-summary">${Icons.svg('edit', { size: 15 })} Write summary</button>
-        ${day.voiceNotes.length ? `<div class="subtle" style="margin-top:10px">${day.voiceNotes.length} voice note(s) saved today.</div>` : ''}
+        <p class="subtle" style="margin:0 0 10px">Captured via the mic button below — for you and ${esc(s.profile.coachName)}.</p>
+        ${day.voiceNotes.length ? `<div class="subtle">${day.voiceNotes.length} voice note(s) saved today.</div>` : ''}
         ${(day.summary.did || day.summary.learned || day.summary.struggled) ? `<div class="callout" style="margin-top:10px">${esc(day.summary.did || day.summary.learned || day.summary.struggled)}</div>` : ''}
-      </div>
-
-      <div class="card" data-act="nav:goals" style="cursor:pointer">
-        <h3>Your goals <span class="pill">view all</span></h3>
-        <p class="subtle" style="margin:0">${s.buildFramework.goal ? esc(s.buildFramework.goal) : 'Set what every call is ultimately for.'}</p>
+        ${!day.voiceNotes.length && !(day.summary.did || day.summary.learned || day.summary.struggled) ? '<p class="subtle" style="margin:0">Nothing captured yet today.</p>' : ''}
       </div>
     </section>`;
   }
@@ -521,7 +515,7 @@
     return `polygon(${tl}% 0%, ${tr}% 0%, ${br}% 100%, ${bl}% 100%)`;
   }
 
-  function salesFunnelCard(agg) {
+  function salesFunnelCard(agg, period) {
     const funnelKeys = Data.vertical().funnel;
     const stages = funnelKeys.map((key) => {
       const m = agg.metrics[key];
@@ -531,7 +525,7 @@
     const widths = stages.map((s) => Math.max(10, Math.round((s.actual / maxActual) * 100)));
 
     return `<div class="card">
-      <h3>Activity Funnel</h3>
+      <h3>${FUNNEL_TITLES[period] || 'Activity Funnel'}</h3>
       <div class="funnel2">
         <div class="funnel2-shape">
           ${stages.map((s, i) => {
@@ -551,6 +545,24 @@
     </div>`;
   }
 
+  // Outcomes as its own chart widget — a simple bar chart (reusing the
+  // vertical-bar pattern already in styles.css) instead of a plain kv list,
+  // colored by whether the outcome is good (gold) or bad (clay).
+  function outcomesChart(agg, period) {
+    const outs = Data.outcomeDefs();
+    const max = Math.max(...outs.map((o) => agg.outcomes[o.key].actual), 1);
+    return `<div class="card">
+      <h3>Outcomes <span class="pill">${esc(Intel.rangeLabelToDate(period))}</span></h3>
+      <div class="bars">
+        ${outs.map((o) => {
+          const val = agg.outcomes[o.key].actual;
+          const h = Math.round((val / max) * 100);
+          return `<div class="bar"><div class="n">${val}</div><div class="col" style="height:${Math.max(6, h)}%;background:${o.bad ? 'var(--clay)' : 'var(--gold)'}"></div><div class="lbl">${esc(o.label)}</div></div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }
+
   // Special Ops — folded into the Tracker page (used to be Pipeline's
   // third sub-tab).
   function specialOpsCard() {
@@ -564,39 +576,20 @@
   }
 
   /* ============================================================
-     AGENT — PIPELINE / DATABASE / SPECIAL OPS
+     AGENT — PIPELINE / SPECIAL OPS
      ============================================================ */
-  let pipeTab = 'pipeline';
-  let pipeSearch = '';
   function viewPipeline() {
     const s = S.get(); const v = Data.vertical();
-    const tabs = [['pipeline', 'Pipeline'], ['database', 'Database']];
-    let body = '';
-    if (pipeTab === 'pipeline') {
-      const active = s.pipeline.filter((p) => !p.stalled).length;
-      const stalled = s.pipeline.filter((p) => p.stalled).length;
-      const val = s.pipeline.reduce((a, p) => a + (p.value || 0), 0);
-      body = `<div class="stat3">
-          <div class="s"><div class="v">${active}</div><div class="k">Active</div></div>
-          <div class="s red"><div class="v">${stalled}</div><div class="k">Stalled</div></div>
-          <div class="s gold"><div class="v">${money(val)}</div><div class="k">${esc(v.valueLabel)}</div></div>
-        </div>
-        <div class="card">${s.pipeline.map((p) => pipeRow(p)).join('') || emptyState('No ' + v.pipelineNoun + 's yet.')}</div>`;
-    } else {
-      const q = pipeSearch.trim().toLowerCase();
-      const filtered = s.pipeline.filter((p) => !q || (p.name + ' ' + (p.detail || '')).toLowerCase().includes(q));
-      body = `<div class="card">
-        <p class="subtle" style="margin:0 0 10px">Every prospect you're working, searchable. Tap to update stage or add a note.</p>
-        <div class="field-icon" style="margin-bottom:2px">
-          ${Icons.svg('search', { size: 15 })}
-          <input class="input" id="pipe-search" placeholder="Search by name or detail" value="${esc(pipeSearch)}" oninput="App.pipeSearch(this.value)">
-        </div>
-        ${filtered.concat([]).sort((a, b) => a.name.localeCompare(b.name)).map((p) => pipeRow(p, true)).join('') || emptyState(q ? 'No matches for "' + pipeSearch + '".' : 'Database is empty.')}
-      </div>`;
-    }
+    const active = s.pipeline.filter((p) => !p.stalled).length;
+    const stalled = s.pipeline.filter((p) => p.stalled).length;
+    const val = s.pipeline.reduce((a, p) => a + (p.value || 0), 0);
     return `<section class="screen active">
-      <div class="tabs">${tabs.map(([k, l]) => `<button class="${pipeTab === k ? 'on' : ''}" data-act="pipe-tab:${k}">${l}</button>`).join('')}</div>
-      ${body}
+      <div class="stat3">
+        <div class="s"><div class="v">${active}</div><div class="k">Active</div></div>
+        <div class="s red"><div class="v">${stalled}</div><div class="k">Stalled</div></div>
+        <div class="s gold"><div class="v">${money(val)}</div><div class="k">${esc(v.valueLabel)}</div></div>
+      </div>
+      <div class="card">${s.pipeline.map((p) => pipeRow(p)).join('') || emptyState('No ' + v.pipelineNoun + 's yet.')}</div>
       <button class="btn gold" data-act="add-pipeline" style="margin-top:12px">${Icons.svg('plus', { size: 14 })} Add ${esc(v.pipelineNoun)}</button>
     </section>`;
   }
@@ -750,8 +743,6 @@
     get authMode() { return authMode; }, set authMode(v) { authMode = v; },
     get authError() { return authError; }, set authError(v) { authError = v; },
     get authInfo() { return authInfo; }, set authInfo(v) { authInfo = v; },
-    get pipeTab() { return pipeTab; }, set pipeTab(v) { pipeTab = v; },
-    get pipeSearch() { return pipeSearch; }, set pipeSearch(v) { pipeSearch = v; },
     get trackerPeriod() { return trackerPeriod; }, set trackerPeriod(v) { trackerPeriod = v; },
     get clientSearch() { return clientSearch; }, set clientSearch(v) { clientSearch = v; },
     get clientStatusFilter() { return clientStatusFilter; }, set clientStatusFilter(v) { clientStatusFilter = v; },
