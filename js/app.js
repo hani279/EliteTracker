@@ -82,6 +82,17 @@
     await Sync.refreshRoster();
   }
 
+  // Manual refresh button (coach topbar) — the roster otherwise only
+  // re-syncs on a fresh login/app boot (see syncForSession above), so a
+  // coach who links a new agent while their own tab stays open would
+  // never see them without this or a hard reload.
+  async function refreshRosterTap() {
+    UI.toast('Refreshing…');
+    await Sync.refreshRoster();
+    UI.render();
+    UI.toast('Roster updated');
+  }
+
   /* ---------- event delegation ---------- */
   document.addEventListener('click', (e) => {
     const t = e.target.closest('[data-act]');
@@ -127,6 +138,7 @@
 
     // ---- menu ----
     if (cmd === 'open-menu') return openMenu();
+    if (cmd === 'refresh-roster') return refreshRosterTap();
     if (cmd === 'close-sheet') return UI.closeSheet();
 
     // ---- focus / to-do ----

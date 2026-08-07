@@ -315,6 +315,7 @@
         <div class="sub">${sub}</div>
       </div>
       <div style="display:flex;align-items:center;gap:8px">
+        ${mode === 'coach' ? `<button class="icon-btn" data-act="refresh-roster" aria-label="Refresh roster">${Icons.svg('reset', { size: 17 })}</button>` : ''}
         <button class="icon-btn" data-act="open-menu" aria-label="Menu">${Icons.svg('menu', { size: 18 })}</button>
       </div>
     </div>`;
