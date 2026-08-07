@@ -290,7 +290,7 @@
   /* ============================================================
      TOP BAR + BOTTOM NAV
      ============================================================ */
-  const AGENT_TITLES = { today: 'Tracker', pipeline: 'Pipeline', goals: 'Goals' };
+  const AGENT_TITLES = { today: 'Tracker', pipeline: 'Pipeline', goals: 'Goals', report: 'Report' };
   const COACH_TITLES = { dashboard: 'Coach Dashboard', clients: 'Clients', alerts: 'Alerts' };
 
   // Superuser preview — lets an allowlisted tester flip which UI renders
@@ -331,9 +331,9 @@
         `<button class="${coachView === k ? 'on' : ''}" data-act="cnav:${k}"><span class="ic">${Icons.svg(ic)}</span>${l}${k === 'alerts' && alertN ? ` <span class="badge">${alertN}</span>` : ''}</button>`).join('');
     } else {
       // Three tabs, with Voice Log as a raised, central action rather than
-      // a plain nav item — it opens the recorder sheet directly (like the
-      // existing 'open-voice' trigger elsewhere), it doesn't route to a view
-      // — it opens a small choice between recording and writing.
+      // a plain nav item — it doesn't route to a view, it opens the
+      // daily-log sheet (collapsed to just "record a voice note";
+      // expands in place for the summary form + today's notes).
       nav.innerHTML = `
         <button class="${current === 'today' ? 'on' : ''}" data-act="nav:today"><span class="ic">${Icons.svg('home')}</span>Tracker</button>
         <button class="voicebtn" data-act="daily-log" aria-label="Record voice note or write a summary"><span class="ic">${Icons.svg('mic', { size: 22 })}</span></button>
@@ -381,6 +381,7 @@
       case 'today': return viewToday();
       case 'pipeline': return viewPipeline();
       case 'goals': return viewGoals();
+      case 'report': return viewReport();
       default: return viewToday();
     }
   }
@@ -424,6 +425,7 @@
       </div>
 
       <div class="tabs" style="margin-top:20px">${periods.map(([k, l]) => `<button class="${trackerPeriod === k ? 'on' : ''}" data-act="tracker-period:${k}">${l}</button>`).join('')}</div>
+      <button class="btn outline sm" data-act="nav:report" style="width:100%;margin-top:10px">${Icons.svg('file', { size: 14 })} Generate report</button>
 
       ${salesFunnelCard(agg, trackerPeriod)}
 
@@ -448,15 +450,53 @@
       ${twoWeekFocusCard()}
 
       ${specialOpsCard()}
+    </section>`;
+  }
+
+  // Report — a plain, print-friendly screen (not a sheet: the print CSS
+  // in styles.css hides #sheet-backdrop entirely and prints #main) built
+  // from the same aggregate the Tracker page already computes. "Print /
+  // Save as PDF" is the browser's native print dialog — no PDF library.
+  function viewReport() {
+    const s = S.get(); const v = Data.vertical();
+    const period = trackerPeriod;
+    const agg = Intel.aggregate(Intel.rangeKeysToDate(period));
+    const periods = [['today', 'Today'], ['wtd', 'WTD'], ['mtd', 'MTD'], ['ytd', 'YTD']];
+    return `<section class="screen active">
+      <div class="btn-row" style="margin-bottom:16px">
+        <button class="btn outline sm" data-act="nav:today">‹ Back</button>
+        <button class="btn gold sm" data-act="print-report">${Icons.svg('download', { size: 14 })} Print / Save as PDF</button>
+      </div>
+      <div class="hero">
+        <h2>Report</h2>
+        <div class="meta"><span>${esc(s.profile.name)}</span><span>·</span><span>${esc(v.label)}</span></div>
+      </div>
+      <div class="card">
+        <h3>${esc(Intel.rangeLabelToDate(period))}</h3>
+        <p class="subtle" style="margin:0">${esc(S.fmtDate(S.todayKey()))} · ${agg.loggedDays}/${agg.workdays} workdays logged${agg.missedDays ? `, ${agg.missedDays} missed` : ''}</p>
+      </div>
+      <div class="tabs" style="margin:12px 0 20px">${periods.map(([k, l]) => `<button class="${period === k ? 'on' : ''}" data-act="tracker-period:${k}">${l}</button>`).join('')}</div>
+
+      ${salesFunnelCard(agg, period)}
 
       <div class="card">
-        <h3>Daily summary</h3>
-        <p class="subtle" style="margin:0 0 10px">Captured via the mic button below, for you${s.profile.coachName ? ` and ${esc(s.profile.coachName)}` : ''}.</p>
-        ${day.voiceNotes.length ? `<div class="subtle">${day.voiceNotes.length} voice note(s) saved today.</div>` : ''}
-        ${(day.summary.did || day.summary.learned || day.summary.struggled) ? `<div class="callout" style="margin-top:10px">${esc(day.summary.did || day.summary.learned || day.summary.struggled)}</div>` : ''}
-        ${!day.voiceNotes.length && !(day.summary.did || day.summary.learned || day.summary.struggled) ? '<p class="subtle" style="margin:0">Nothing captured yet today.</p>' : ''}
+        <h3>Activity</h3>
+        ${agg.defs.map((m) => reportRow(agg.metrics[m.key].label, agg.metrics[m.key].actual, agg.metrics[m.key].target)).join('')}
+      </div>
+
+      <div class="card">
+        <h3>Outcomes</h3>
+        ${agg.outs.map((o) => reportRow(agg.outcomes[o.key].label, agg.outcomes[o.key].actual, null)).join('')}
       </div>
     </section>`;
+  }
+  function reportRow(label, actual, target) {
+    const pct = target ? Math.min(100, Math.round((actual / target) * 100)) : (actual > 0 ? 100 : 0);
+    return `<div class="num-row">
+      <div class="label"><div class="l">${esc(label)}</div>
+        <div class="track"><div class="fill" style="width:${pct}%;background:${paceColor(pct)}"></div></div></div>
+      <div class="stepper"><div class="val">${actual}${target ? `<span class="t">/${target}</span>` : ''}</div></div>
+    </div>`;
   }
 
   function twoWeekFocusCard() {

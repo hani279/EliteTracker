@@ -345,8 +345,6 @@ svg{display:block}
 .choice.on{border-color:var(--gold);background:var(--surface-2)}
 .choice .ct{font-family:var(--headline);font-size:16px;font-weight:480;color:var(--bone)}
 .choice .cs{font-size:13px;color:var(--bone-faint);margin-top:4px;line-height:1.4}
-.choice.icon-row{display:flex;align-items:center;gap:13px;font-size:14.5px;font-weight:500;color:var(--bone);text-decoration:none;cursor:pointer}
-.choice.icon-row svg{flex:0 0 auto;color:var(--gold-ink)}
 
 /* ---------- Menu tile grid (square, compact — replaces long lists of
    full-width rows for the settings/menu sheet) ---------- */

@@ -158,8 +158,7 @@
 
     // ---- summary / voice ----
     if (cmd === 'daily-log') return dailyLogSheet();
-    if (cmd === 'open-summary') return summarySheet();
-    if (cmd === 'open-voice') return voiceSheet();
+    if (cmd === 'daily-log-toggle') return toggleDailyLog();
     if (cmd === 'rec-start') return startRecording();
     if (cmd === 'rec-stop') return stopRecording();
     if (cmd === 'vn-play') return playVoice(a);
@@ -195,6 +194,7 @@
     if (cmd === 'client-filter') { UI.clientStatusFilter = a; rerender(); return; }
     if (cmd === 'sent-reports') return sentReportsSheet();
     if (cmd === 'bulk-reports') return bulkReportsSheet();
+    if (cmd === 'print-report') { window.print(); return; }
 
     // ---- settings ----
     if (cmd === 'toggle-setting') return toggleSetting(a);
@@ -330,41 +330,46 @@
     });
   }
 
-  /* ---------- daily log entry point (central mic button) ---------- */
-  function dailyLogSheet() {
-    UI.openSheet(`<h3>Daily log</h3>
-      <p class="subtle">Capture today in whichever way's fastest right now.</p>
-      <button class="choice icon-row" data-act="open-voice">${Icons.svg('mic', { size: 17 })}<span>Record a voice note</span></button>
-      <button class="choice icon-row" data-act="open-summary">${Icons.svg('edit', { size: 17 })}<span>Write a summary</span></button>`);
-  }
-
-  /* ---------- summary ---------- */
-  function summarySheet() {
-    const d = S.dayRecord();
-    UI.openSheet(`<h3>Daily summary</h3>
-      <div class="field"><label>What did we do?</label><textarea class="textarea" id="sm-did">${UI.esc(d.summary.did)}</textarea></div>
-      <div class="field"><label>What did we learn?</label><textarea class="textarea" id="sm-learned">${UI.esc(d.summary.learned)}</textarea></div>
-      <div class="field"><label>Where did we struggle?</label><textarea class="textarea" id="sm-struggled">${UI.esc(d.summary.struggled)}</textarea></div>
-      <button class="btn gold" id="sm-save">Save summary</button>`);
-    $('sm-save').addEventListener('click', () => {
-      d.summary = { did: $('sm-did').value, learned: $('sm-learned').value, struggled: $('sm-struggled').value };
-      S.save(); UI.closeSheet(); UI.render(); UI.toast('Summary saved');
-    });
-  }
-
-  /* ---------- voice notes ---------- */
+  /* ---------- daily log entry point (central mic button) ----------
+     One sheet, not a menu of separate sheets. Collapsed shows only the
+     record control — the fastest path. "More" discloses the summary
+     form and today's recorded notes in place, without leaving the
+     sheet or offering "write a summary" as a co-equal top-level choice.
+     The record control's markup checks mediaRecorder's live state
+     (not a template default) so re-rendering on expand/collapse, or
+     reopening the sheet mid-recording, never loses the in-progress
+     recording or its running timer. */
   let mediaRecorder = null, chunks = [], recTimer = null, recSecs = 0;
-  function voiceSheet() {
+  let dailyLogExpanded = false;
+  function dailyLogSheet() { dailyLogExpanded = false; renderDailyLog(); }
+  function toggleDailyLog() { dailyLogExpanded = !dailyLogExpanded; renderDailyLog(); }
+  function renderDailyLog() {
     const d = S.dayRecord();
-    UI.openSheet(`<h3>Voice notes</h3>
-      <p class="subtle">One quick note — what did you do, learn, struggle with. Syncs to your coach in the background; transcription & auto-summary are next.</p>
+    const recording = !!(mediaRecorder && mediaRecorder.state === 'recording');
+    UI.openSheet(`<h3>Daily log</h3>
       <div id="rec-ui" style="text-align:center;margin:18px 0">
-        <button class="btn gold" id="rec-btn" data-act="rec-start">${Icons.svg('mic', { size: 15 })} Start recording</button>
-        <div id="rec-time" class="subtle" style="margin-top:8px"></div>
+        ${recording
+          ? `<button class="btn gold" id="rec-btn" data-act="rec-stop">${Icons.svg('stop', { size: 15 })} Stop recording</button>`
+          : `<button class="btn gold" id="rec-btn" data-act="rec-start">${Icons.svg('mic', { size: 15 })} Record a voice note</button>`}
+        <div id="rec-time" class="subtle" style="margin-top:8px">${recording ? `<span class="rec-dot"></span> Recording ${recSecs}s` : ''}</div>
       </div>
-      <div class="section-title">Today's notes</div>
-      <div id="vn-list">${voiceListHtml(d)}</div>`);
-    wireVoiceList();
+      <button class="btn ghost sm" data-act="daily-log-toggle" style="width:100%">${dailyLogExpanded ? `${Icons.svg('minus', { size: 13 })} Show less` : `${Icons.svg('plus', { size: 13 })} More — write a summary, see today's notes`}</button>
+      ${dailyLogExpanded ? `
+        <p class="subtle" style="margin-top:16px">Syncs to your coach in the background; transcription & auto-summary are next.</p>
+        <div class="section-title">Write a summary</div>
+        <div class="field"><label>What did we do?</label><textarea class="textarea" id="sm-did">${UI.esc(d.summary.did)}</textarea></div>
+        <div class="field"><label>What did we learn?</label><textarea class="textarea" id="sm-learned">${UI.esc(d.summary.learned)}</textarea></div>
+        <div class="field"><label>Where did we struggle?</label><textarea class="textarea" id="sm-struggled">${UI.esc(d.summary.struggled)}</textarea></div>
+        <button class="btn outline sm" id="sm-save">Save summary</button>
+        <div class="section-title" style="margin-top:20px">Today's notes</div>
+        <div id="vn-list">${voiceListHtml(d)}</div>
+      ` : ''}`);
+    if (dailyLogExpanded) {
+      $('sm-save').addEventListener('click', () => {
+        d.summary = { did: $('sm-did').value, learned: $('sm-learned').value, struggled: $('sm-struggled').value };
+        S.save(); UI.toast('Summary saved');
+      });
+    }
   }
   function voiceListHtml(d) {
     if (!d.voiceNotes.length) return '<p class="subtle">No voice notes yet.</p>';
@@ -400,7 +405,7 @@
   function stopRecording() {
     if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
     clearInterval(recTimer);
-    const btn = $('rec-btn'); if (btn) { btn.innerHTML = Icons.svg('mic', { size: 15 }) + ' Start recording'; btn.setAttribute('data-act', 'rec-start'); }
+    const btn = $('rec-btn'); if (btn) { btn.innerHTML = Icons.svg('mic', { size: 15 }) + ' Record a voice note'; btn.setAttribute('data-act', 'rec-start'); }
     const t = $('rec-time'); if (t) t.textContent = '';
   }
   // Fire-and-forget, same pattern as sync.js's push(): the recording is

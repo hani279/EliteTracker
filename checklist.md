@@ -46,17 +46,19 @@ Follow-up polish requested directly after the initial Tracker rebuild — record
 - [x] Outcomes bars are themselves the "tap to add" control (removed the separate tag row from the numbers card) — now a manual-correction fallback; see Pipeline link below
 - [x] ~~Conversion funnel is now an actual funnel visual~~ — tried, but it read as a confusing duplicate of the Activity Funnel; replaced with plain R/O/G progress-bar rows (same style as "Log today's numbers"), same cumulative-retention data, no funnel shape
 - [x] More spacing between "Log today's numbers" and the period tabs below it
-- [x] Central mic button now opens a choice (record a voice note / write a summary) instead of jumping straight to recording; fixed the icon not being centered in the circle
+- [x] ~~Central mic button now opens a choice (record a voice note / write a summary) instead of jumping straight to recording~~ — superseded below: the choice-of-two-sheets pattern was replaced by one expandable sheet
 - [x] Removed em dashes from the Tracker page's visible copy
+- [x] Removed the "Daily summary" card from the Tracker page and folded it into the mic button's sheet (see below) — the Tracker page no longer previews captured-but-uneditable copies of it
+- [x] Mic button's "Daily log" sheet is now a single expandable sheet, not a menu of two separate sheets: collapsed shows only "Record a voice note"; "More" expands in place to reveal the write-a-summary form and today's recorded voice notes, without closing/reopening the sheet
 
 ## Reports (moves into Tracker, no longer its own tab)
 
 - [x] Remove the standalone Reports tab
-- [ ] Add a **"Generate report"** button on the Tracker page
-  - [ ] Pulls data for whatever time period is currently selected (e.g. "This Week")
-  - [ ] Outputs a PDF
-- [ ] Add graphs to the generated report
-- [ ] Add **Detailed Reports** — a separate, hidden/advanced feature for coaches to pull a custom date range
+- [x] Add a **"Generate report"** button on the Tracker page
+  - [x] Pulls data for whatever time period is currently selected (Today/WTD/MTD/YTD, matches the Tracker page's own period tabs)
+  - [x] Outputs a PDF — via the browser's native print dialog ("Save as PDF"), not a PDF library; a `@media print` stylesheet (already scaffolded in styles.css) hides app chrome and prints only the report
+- [x] Add graphs to the generated report — reuses the same Activity Funnel visual as the Tracker page
+- [ ] Add **Detailed Reports** — a separate, hidden/advanced feature for coaches to pull a custom date range — not built yet
 
 ## Automated daily coach summary
 
