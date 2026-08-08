@@ -208,7 +208,47 @@ it). This whole feature is new and untested against a live send — the
 `curl` step above is how to verify it actually works before trusting the
 schedule.
 
-## 9. Sanity check
+## 9. Voice note transcription + AI summary
+
+Every voice note now gets auto-transcribed and summarized so a coach can
+skim it without pressing play — a `transcribe-voice-note` Edge Function
+using OpenAI's Whisper (transcription) and a `gpt-4o-mini` chat
+completion (summary), triggered automatically right after an agent's
+recording finishes uploading. `voice_notes.transcript` /
+`.ai_summary` are existing columns (from `0001_init.sql`) that were
+sitting unused until now.
+
+1. **Get an OpenAI API key** at
+   [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+   (needs billing enabled on the account — Whisper + `gpt-4o-mini` are
+   both pay-per-use, and this is a low-volume feature: short voice
+   notes, one summary each).
+2. **Run the migration** — paste
+   [`supabase/migrations/0011_coach_voice_note_delete.sql`](supabase/migrations/0011_coach_voice_note_delete.sql)
+   into the SQL Editor. This is unrelated to OpenAI — it's what lets a
+   coach delete an agent's voice note (both the Storage object and the
+   row), which shipped alongside the transcription feature.
+3. **Set the function's secret**:
+   ```
+   npx supabase secrets set OPENAI_API_KEY=<your OpenAI API key>
+   ```
+4. **Deploy the function**:
+   ```
+   npx supabase functions deploy transcribe-voice-note
+   ```
+5. **Test it**: record a voice note as an agent, wait a few seconds,
+   then check **Table Editor → voice_notes** — `transcript` and
+   `ai_summary` should be populated on that row. If they're still
+   null after a minute, the coach's client sheet (or the dashboard's
+   "Voice notes" card) has a manual **retry** link on any note stuck
+   without a summary — check the function's logs
+   (`npx supabase functions logs transcribe-voice-note`) if that also
+   doesn't work.
+
+This whole feature is new and untested against a live OpenAI call —
+step 5 above is how to verify it actually works.
+
+## 10. Sanity check
 
 1. Sign up as a coach → check **Table Editor → profiles** for a new row with
    `role = 'coach'` and a generated `coach_code`.

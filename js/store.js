@@ -46,6 +46,7 @@
       },
       reportsLog: [],           // {id,type,rangeLabel,date,score}
       coachRoster: [],          // demo roster for coach view
+      recentVoiceNotes: [],     // coach dashboard: latest notes across the whole roster
       createdAt: Date.now(),
     };
   }

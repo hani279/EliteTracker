@@ -166,6 +166,8 @@
     if (cmd === 'vn-play') return playVoice(a);
     if (cmd === 'vn-del') return delVoice(a);
     if (cmd === 'cc-vn-play') return playCoachVoiceNote(a);
+    if (cmd === 'cc-vn-del') return deleteCoachVoiceNote(a, b);
+    if (cmd === 'cc-vn-transcribe') return retryCoachTranscription(a, b);
 
     // ---- tracker ----
     if (cmd === 'tracker-period') { UI.trackerPeriod = a; rerender(); return; }
@@ -448,6 +450,14 @@
     if (error) { console.warn('voice note upload failed', error); return; }
     const d = S.dayRecord(); const v = (d.voiceNotes || []).find((x) => x.id === id);
     if (v) { v.storagePath = path; S.save(); }
+    // Fire-and-forget, same as the upload itself — the voice_notes row
+    // must exist first (sync.js's push() only creates it once
+    // storagePath is set, which just happened above), so this can't
+    // run until at least one debounced push has landed. A short delay
+    // is simpler than threading a "row exists now" signal through
+    // scheduleSync()'s timer for what's already a best-effort trigger
+    // (the coach's manual retry is the real safety net if this misses).
+    setTimeout(() => { Sync.triggerTranscription(id); }, 2000);
   }
   async function playVoice(id) {
     let blob = await S.getAudio(id);
@@ -716,20 +726,44 @@
       btn.removeAttribute('disabled'); btn.textContent = 'Save note';
       UI.toast(r.error ? 'Could not save — ' + r.error : 'Note saved');
     });
-    Sync.fetchAgentVoiceNotes(id).then((notes) => {
+    loadCoachVoiceList(id);
+  }
+  function loadCoachVoiceList(agentId) {
+    Sync.fetchAgentVoiceNotes(agentId).then((notes) => {
       const el = $('cc-voice-list'); // sheet may have closed already — guard
       if (!el) return;
-      el.innerHTML = notes.length ? notes.map((v) => `<div class="vn">
-        <div class="play" data-act="cc-vn-play:${UI.esc(v.storage_path)}">${Icons.svg('play', { size: 13 })}</div>
-        <div style="flex:1"><div style="font-weight:600;font-size:13px">Voice note</div>
-        <div class="subtle" style="font-size:11px">${new Date(v.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })} · ${v.duration_sec || 0}s</div></div>
-      </div>`).join('') : '<p class="subtle">No voice notes yet.</p>';
+      el.innerHTML = notes.length ? notes.map((v) => UI.coachVoiceNoteRow(v, false)).join('') : '<p class="subtle">No voice notes yet.</p>';
     });
   }
   async function playCoachVoiceNote(storagePath) {
     const url = await Sync.getVoiceNoteSignedUrl(storagePath);
     if (!url) { UI.toast('Could not load audio'); return; }
     new Audio(url).play();
+  }
+  // storagePath doubles as the agent id lookup ("<agentId>/<file>") so
+  // this can refresh whichever view is showing it — the roster-wide
+  // dashboard cache always, and the open client sheet's own list if
+  // that's the one the coach deleted from — without threading agentId
+  // through the data-act separately.
+  async function deleteCoachVoiceNote(id, storagePath) {
+    const r = await Sync.deleteAgentVoiceNote(id, storagePath);
+    if (r.error) { UI.toast('Could not delete — ' + r.error); return; }
+    const s = S.get();
+    s.recentVoiceNotes = (s.recentVoiceNotes || []).filter((v) => v.id !== id);
+    S.save(); UI.render();
+    const agentId = storagePath.split('/')[0];
+    if ($('cc-voice-list')) loadCoachVoiceList(agentId);
+    UI.toast('Voice note deleted');
+  }
+  async function retryCoachTranscription(id, storagePath) {
+    UI.toast('Retrying transcription…');
+    const r = await Sync.triggerTranscription(id);
+    if (r.error) { UI.toast('Transcription failed — ' + r.error); return; }
+    UI.toast('Transcribed');
+    const note = (S.get().recentVoiceNotes || []).find((v) => v.id === id);
+    if (note) { note.transcript = r.transcript; note.ai_summary = r.summary; S.save(); }
+    UI.render();
+    if ($('cc-voice-list') && storagePath) loadCoachVoiceList(storagePath.split('/')[0]);
   }
 
   /* ---------- detailed reports (coach, custom date range) ----------

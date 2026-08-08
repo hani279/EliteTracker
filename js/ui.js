@@ -499,6 +499,29 @@
     </div>`;
   }
 
+  // Coach-side voice note row — shared by the dashboard's cross-agent
+  // "Voice notes" card and a single client's own list, so both read
+  // identically. AI summary is the headline (that's the whole point:
+  // skim a message without pressing play); falls back to the raw
+  // transcript, then to a "Transcribing…" state with a manual retry
+  // for whenever the automatic trigger failed or is still running.
+  function coachVoiceNoteRow(v, showAgent) {
+    const when = new Date(v.created_at);
+    const dateLabel = when.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) + ' · ' + when.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' });
+    let body;
+    if (v.ai_summary) body = `<div style="margin-top:3px">${esc(v.ai_summary)}</div>`;
+    else if (v.transcript) body = `<div class="subtle" style="margin-top:3px">${esc(v.transcript.length > 160 ? v.transcript.slice(0, 160) + '…' : v.transcript)}</div>`;
+    else body = `<div class="subtle" style="margin-top:3px">Transcribing… <span data-act="cc-vn-transcribe:${v.id}:${esc(v.storage_path)}" style="text-decoration:underline;cursor:pointer">retry</span></div>`;
+    return `<div class="vn" style="align-items:flex-start">
+      <div class="play" data-act="cc-vn-play:${esc(v.storage_path)}" style="margin-top:2px">${Icons.svg('play', { size: 13 })}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:13px">${showAgent ? `${esc(v.agentName)} · ` : ''}${dateLabel} · ${v.duration_sec || 0}s</div>
+        ${body}
+      </div>
+      <button class="icon-btn sm" data-act="cc-vn-del:${v.id}:${esc(v.storage_path)}" title="Delete" style="flex:0 0 auto">${Icons.svg('close', { size: 13 })}</button>
+    </div>`;
+  }
+
   function twoWeekFocusCard() {
     const s = S.get();
     const items = s.twoWeekFocus || [];
@@ -720,7 +743,11 @@
     const onTrack = r.filter((c) => c.status === 'On track').length;
     const atRisk = r.filter((c) => c.status === 'At risk').length;
     const checkins = r.filter((c) => /Today/.test(c.last)).length;
+    const notes = s.recentVoiceNotes || [];
     return `<section class="screen active">
+      <div class="card" style="margin-top:0"><h3>Voice notes <span class="pill">${notes.length}</span></h3>
+        ${notes.length ? notes.map((v) => coachVoiceNoteRow(v, true)).join('') : '<p class="subtle" style="margin:0">No voice notes from your roster yet.</p>'}
+      </div>
       <div class="grid2">
         <div class="card" style="margin-top:0"><div class="section-title">Active clients</div><div style="font-size:26px;font-family:var(--mono);font-weight:500">${r.length}</div></div>
         <div class="card" style="margin-top:0"><div class="section-title">On track</div><div style="font-size:26px;font-family:var(--mono);font-weight:500;color:var(--green)">${onTrack}</div></div>
@@ -826,6 +853,6 @@
     get clientSort() { return clientSort; }, set clientSort(v) { clientSort = v; },
     get onbTmp() { return onbTmp; },
     captureOnb, finishOnboarding, clearOnbDraft, initials, esc, money, sparkline, effectiveMode,
-    reportRow, paceColor,
+    reportRow, paceColor, coachVoiceNoteRow,
   };
 })(window);

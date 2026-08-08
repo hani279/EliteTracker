@@ -209,7 +209,7 @@
      local Store, since coaches don't have their agents' data locally. */
   async function pullRoster(c, pid, s) {
     const { data: agents } = await c.from('profiles').select('id,name,vertical,targets,settings').eq('coach_id', pid);
-    if (!agents || !agents.length) { s.coachRoster = []; s.demoAlerts = []; return; }
+    if (!agents || !agents.length) { s.coachRoster = []; s.demoAlerts = []; s.recentVoiceNotes = []; return; }
 
     const ids = agents.map((a) => a.id);
     const since = S.addDays(S.todayKey(), -60);
@@ -220,6 +220,15 @@
 
     s.coachRoster = agents.map((a) => rosterEntry(a, byAgent[a.id] || {}));
     s.demoAlerts = buildAlerts(s.coachRoster);
+
+    // Cached the same way as coachRoster (not fetched on demand) so the
+    // dashboard's voice-notes card renders synchronously and refreshes
+    // on the same boot/manual-refresh cadence as everything else.
+    const nameById = {}; agents.forEach((a) => { nameById[a.id] = a.name || 'Unnamed'; });
+    const { data: notes } = await c.from('voice_notes')
+      .select('id, profile_id, storage_path, duration_sec, transcript, ai_summary, created_at')
+      .in('profile_id', ids).order('created_at', { ascending: false }).limit(15);
+    s.recentVoiceNotes = (notes || []).map((n) => Object.assign({ agentName: nameById[n.profile_id] }, n));
   }
 
   // Pace for the 7-day window ending `weeksAgo` weeks back (weeksAgo=0 is
@@ -400,7 +409,7 @@
     const c = client(); const session = global.Auth && Auth.getSession();
     if (!c || !session) return [];
     const { data, error } = await c.from('voice_notes')
-      .select('id, day, storage_path, duration_sec, created_at')
+      .select('id, day, storage_path, duration_sec, transcript, ai_summary, created_at')
       .eq('profile_id', agentId).order('created_at', { ascending: false }).limit(30);
     if (error) { console.warn('fetch agent voice notes failed', error); return []; }
     return data || [];
@@ -411,6 +420,45 @@
     const { data, error } = await c.storage.from('voice-notes').createSignedUrl(storagePath, 60);
     if (error) { console.warn('signed url failed', error); return null; }
     return data && data.signedUrl;
+  }
+  // Removes both the storage object and the metadata row — relies on
+  // the coach-delete policies added in 0011_coach_voice_note_delete.sql.
+  // Storage failing isn't fatal to the row delete (an orphaned object
+  // with no row is invisible everywhere in the app either way), but
+  // try it first so a failed row-delete doesn't leave a dangling file
+  // with nothing pointing at it.
+  //
+  // A plain .delete() with no matching RLS-visible row succeeds with
+  // zero rows affected rather than erroring — Postgres RLS just filters
+  // the row out before the DELETE ever sees it, silently. Confirmed
+  // this directly: before 0011 was run, calling this returned {ok:true}
+  // with nothing actually deleted. .select() after .delete() gets the
+  // deleted row(s) back, so an empty result can be treated as the
+  // failure it actually is instead of a false success.
+  async function deleteAgentVoiceNote(voiceNoteId, storagePath) {
+    const c = client();
+    if (!c) return { error: 'Not connected — check your internet connection.' };
+    const { error: storageErr } = await c.storage.from('voice-notes').remove([storagePath]);
+    if (storageErr) console.warn('delete voice note audio failed', storageErr);
+    const { data, error } = await c.from('voice_notes').delete().eq('id', voiceNoteId).select();
+    if (error) return { error: error.message };
+    if (!data || !data.length) return { error: 'Nothing deleted — you may not have permission.' };
+    return { ok: true };
+  }
+  // Fire-and-forget trigger for the transcribe-voice-note Edge
+  // Function — same shape as sendNudge()'s functions.invoke call.
+  // Used both right after a fresh upload and as a manual coach retry.
+  async function triggerTranscription(voiceNoteId) {
+    const c = client();
+    if (!c) return { error: 'Not connected' };
+    try {
+      const { data, error } = await c.functions.invoke('transcribe-voice-note', { body: { voiceNoteId } });
+      if (error) throw error;
+      return data || {};
+    } catch (e) {
+      console.warn('transcription trigger failed', e);
+      return { error: String(e) };
+    }
   }
 
   // ---------- coach: Detailed Reports (custom date range) ----------
@@ -438,6 +486,7 @@
 
   global.Sync = {
     push, pull, refreshRoster, sendCoachMessage, fetchInbox, markMessageRead, fetchSentReports, fetchCoachNote, saveCoachNote,
-    fetchAgentVoiceNotes, getVoiceNoteSignedUrl, fetchAgentVertical, fetchAgentDayRecords,
+    fetchAgentVoiceNotes, getVoiceNoteSignedUrl, deleteAgentVoiceNote, triggerTranscription,
+    fetchAgentVertical, fetchAgentDayRecords,
   };
 })(window);
