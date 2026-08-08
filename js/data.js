@@ -44,8 +44,8 @@
         { key: 'calls',        label: 'Calls',            short: 'Calls',  target: 20, minutesEach: 4 },
         { key: 'conversations',label: 'Conversations',    short: 'Conv',   target: 8,  minutesEach: 6 },
         { key: 'social',       label: 'LinkedIn / social',short: 'Social', target: 4,  minutesEach: 5 },
-        { key: 'mtgsBooked',   label: '1st mtgs booked',  short: 'Bkd',    target: 1,  minutesEach: 0 },
-        { key: 'mtgsSat',      label: '1st mtgs sat',     short: 'Sat',    target: 1,  minutesEach: 40 },
+        { key: 'mtgsBooked',   label: '1st meetings booked',  short: 'Bkd',    target: 1,  minutesEach: 0 },
+        { key: 'mtgsSat',      label: '1st meetings sat',     short: 'Sat',    target: 1,  minutesEach: 40 },
         { key: 'addedPipeline',label: 'Added to pipeline',short: 'Pipe',   target: 1,  minutesEach: 0 },
       ],
       outcomes: [

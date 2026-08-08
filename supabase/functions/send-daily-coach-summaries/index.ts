@@ -60,8 +60,8 @@ const VERTICALS: Record<string, { activity: MetricDef[]; outcomes: MetricDef[] }
       { key: "calls", label: "Calls" },
       { key: "conversations", label: "Conversations" },
       { key: "social", label: "LinkedIn / social" },
-      { key: "mtgsBooked", label: "1st mtgs booked" },
-      { key: "mtgsSat", label: "1st mtgs sat" },
+      { key: "mtgsBooked", label: "1st meetings booked" },
+      { key: "mtgsSat", label: "1st meetings sat" },
       { key: "addedPipeline", label: "Added to pipeline" },
     ],
     outcomes: [

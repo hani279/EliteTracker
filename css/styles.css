@@ -156,7 +156,7 @@ svg{display:block}
 /* ---------- Top bar (frosted glass — content scrolls beneath it) ---------- */
 .topbar{
   position:sticky;top:0;z-index:40;
-  display:flex;align-items:flex-end;justify-content:space-between;
+  display:flex;align-items:center;justify-content:space-between;
   padding:calc(var(--safe-top) + 16px) 18px 14px;
   background:var(--glass-chrome);
   -webkit-backdrop-filter:var(--glass-blur-sm);
@@ -164,7 +164,6 @@ svg{display:block}
   border-bottom:1px solid var(--hairline-soft);
 }
 .topbar h1{font-family:var(--headline);font-weight:480;font-size:21px;margin:0;letter-spacing:-.005em;color:var(--bone)}
-.topbar .sub{font-size:12px;color:var(--bone-faint);margin-top:3px}
 .icon-btn{width:36px;height:36px;border-radius:var(--radius-sm);background:var(--surface-2);color:var(--bone-muted);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
 .icon-btn:active{background:var(--hairline)}
 
@@ -321,10 +320,12 @@ svg{display:block}
 .bottomnav button.on .ic{background:var(--gold-tint)}
 
 /* Voice Log — a raised, central action rather than a plain tab, to
-   encourage actually using the recorder instead of it hiding in a card. */
-.bottomnav .voicebtn{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0;gap:0;width:54px;height:54px;border-radius:50%;background:var(--gold);margin-top:-22px;box-shadow:var(--shadow-floating);border:3px solid var(--page-bg)}
+   encourage actually using the recorder instead of it hiding in a card.
+   Sized on the Fibonacci sequence, same as the rest of the app's scale
+   (button/icon were already ~55/~21 — bumped to the next step, 89/34). */
+.bottomnav .voicebtn{flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0;gap:0;width:89px;height:89px;border-radius:50%;background:var(--gold);margin-top:-38px;box-shadow:var(--shadow-floating);border:3px solid var(--page-bg)}
 .bottomnav .voicebtn .ic{width:auto;height:auto;display:flex;align-items:center;justify-content:center}
-.bottomnav .voicebtn .ic svg{width:23px;height:23px;color:var(--ink);display:block}
+.bottomnav .voicebtn .ic svg{width:34px;height:34px;color:var(--ink);display:block}
 .bottomnav .voicebtn:active{background:var(--gold-dim)}
 
 /* ---------- Forms ---------- */

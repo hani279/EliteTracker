@@ -290,8 +290,8 @@
   /* ============================================================
      TOP BAR + BOTTOM NAV
      ============================================================ */
-  const AGENT_TITLES = { today: 'Tracker', pipeline: 'Pipeline', goals: 'Goals', report: 'Report' };
-  const COACH_TITLES = { dashboard: 'Coach Dashboard', clients: 'Clients', alerts: 'Alerts' };
+  const AGENT_TITLES = { pipeline: 'Pipeline', goals: 'Goals', report: 'Report' };
+  const COACH_TITLES = { clients: 'Clients', alerts: 'Alerts' };
 
   // Superuser preview — lets an allowlisted tester flip which UI renders
   // without touching the account's real role in the database (see
@@ -305,15 +305,11 @@
 
   function renderTopbar() {
     const s = S.get(); const mode = effectiveMode(s);
-    const title = mode === 'coach' ? COACH_TITLES[coachView] : AGENT_TITLES[current];
-    const sub = mode === 'coach'
-      ? esc(s.profile.name) + (s.profile.brand ? ' · ' + esc(s.profile.brand) : ' · Head Coach')
-      : Data.vertical().label + ' · ' + esc(s.profile.name);
+    const title = mode === 'coach'
+      ? (coachView === 'dashboard' ? `${esc(s.profile.name)} Dashboard` : COACH_TITLES[coachView])
+      : (current === 'today' ? `${esc(s.profile.name)} Tracker` : AGENT_TITLES[current]);
     $('topbar').innerHTML = `<div class="topbar">
-      <div>
-        <h1>${title}</h1>
-        <div class="sub">${sub}</div>
-      </div>
+      <div><h1>${title}</h1></div>
       <div style="display:flex;align-items:center;gap:8px">
         ${mode === 'coach' ? `<button class="icon-btn" data-act="refresh-roster" aria-label="Refresh roster">${Icons.svg('reset', { size: 17 })}</button>` : ''}
         <button class="icon-btn" data-act="open-menu" aria-label="Menu">${Icons.svg('menu', { size: 18 })}</button>
@@ -336,7 +332,7 @@
       // expands in place for the summary form + today's notes).
       nav.innerHTML = `
         <button class="${current === 'today' ? 'on' : ''}" data-act="nav:today"><span class="ic">${Icons.svg('home')}</span>Tracker</button>
-        <button class="voicebtn" data-act="daily-log" aria-label="Record voice note or write a summary"><span class="ic">${Icons.svg('mic', { size: 22 })}</span></button>
+        <button class="voicebtn" data-act="daily-log" aria-label="Record voice note or write a summary"><span class="ic">${Icons.svg('mic', { size: 34 })}</span></button>
         <button class="${current === 'pipeline' ? 'on' : ''}" data-act="nav:pipeline"><span class="ic">${Icons.svg('folder')}</span>Pipeline</button>`;
     }
   }
@@ -410,7 +406,7 @@
     const doneFocus = day.focus.filter((f) => f.done).length;
     const agg = Intel.aggregate(Intel.rangeKeysToDate(trackerPeriod));
     const conv = Intel.conversions(agg);
-    const periods = [['today', 'Today'], ['wtd', 'WTD'], ['mtd', 'MTD'], ['ytd', 'YTD']];
+    const periods = [['today', 'Today'], ['wtd', 'This week'], ['mtd', 'This month'], ['ytd', 'This year']];
 
     return `
     <section class="screen active">
@@ -461,7 +457,7 @@
     const s = S.get(); const v = Data.vertical();
     const period = trackerPeriod;
     const agg = Intel.aggregate(Intel.rangeKeysToDate(period));
-    const periods = [['today', 'Today'], ['wtd', 'WTD'], ['mtd', 'MTD'], ['ytd', 'YTD']];
+    const periods = [['today', 'Today'], ['wtd', 'This week'], ['mtd', 'This month'], ['ytd', 'This year']];
     return `<section class="screen active">
       <div class="btn-row" style="margin-bottom:16px">
         <button class="btn outline sm" data-act="nav:today">‹ Back</button>
