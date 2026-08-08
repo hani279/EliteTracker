@@ -689,6 +689,7 @@
       <div class="btn-row" style="margin-top:14px"><button class="btn outline" data-act="close-sheet">Close</button>
       <button class="btn gold" id="cc-msg">Send nudge</button></div>
       <button class="btn outline" id="cc-report" style="margin-top:10px;width:100%">${Icons.svg('file', { size: 15 })} Send daily report</button>
+      <button class="btn ghost sm" id="cc-detailed" style="margin-top:6px;width:100%">${Icons.svg('file', { size: 13 })} Detailed report (custom date range)</button>
       <div class="field" style="margin-top:16px;margin-bottom:0"><label>Private notes — only you see this</label>
         <textarea class="textarea" id="cc-note" placeholder="Loading…" style="min-height:80px"></textarea></div>
       <button class="btn outline sm" id="cc-note-save" style="margin-top:8px">Save note</button>
@@ -696,6 +697,7 @@
       <div id="cc-voice-list"><p class="subtle">Loading…</p></div>`);
     $('cc-msg').addEventListener('click', () => sendNudge(c));
     $('cc-report').addEventListener('click', () => dailyReportSheet(c));
+    $('cc-detailed').addEventListener('click', () => detailedReportSheet(c));
     Sync.fetchSentReports(id).then((reports) => {
       const el = $('cc-last-report'); // sheet may have closed already — guard
       if (!el) return;
@@ -728,6 +730,61 @@
     const url = await Sync.getVoiceNoteSignedUrl(storagePath);
     if (!url) { UI.toast('Could not load audio'); return; }
     new Audio(url).play();
+  }
+
+  /* ---------- detailed reports (coach, custom date range) ----------
+     Deliberately a separate, buried path (client sheet -> ghost
+     button), not a nav tab — this is the advanced/raw counterpart to
+     the agent's own "Generate report" on Tracker (today/WTD/MTD/YTD
+     presets). No target/pace math here on purpose: a target is a
+     daily figure and turning it into a fair total over an arbitrary
+     range means re-deriving workdays-in-range (see intelligence.js's
+     aggregate()) — out of scope for what's meant to stay a simple
+     raw pull, not a rebuild of the Tracker report. */
+  function detailedReportSheet(c) {
+    const today = S.todayKey();
+    const from = S.addDays(today, -29);
+    UI.openSheet(`<h3>Detailed report — ${UI.esc(c.name)}</h3>
+      <p class="subtle">Pull raw activity and outcomes for any date range.</p>
+      <div class="field"><label>From</label><input type="date" class="input" id="dr-from" value="${from}" max="${today}"></div>
+      <div class="field"><label>To</label><input type="date" class="input" id="dr-to" value="${today}" max="${today}"></div>
+      <button class="btn gold sm" id="dr-generate" style="width:100%">Generate</button>
+      <div id="dr-result" style="margin-top:16px"></div>`);
+    $('dr-generate').addEventListener('click', () => runDetailedReport(c));
+  }
+  async function runDetailedReport(c) {
+    const from = $('dr-from').value, to = $('dr-to').value;
+    if (!from || !to || from > to) { UI.toast('Pick a valid date range'); return; }
+    const result = $('dr-result'); result.innerHTML = '<p class="subtle">Loading…</p>';
+
+    const [vertical, records] = await Promise.all([
+      Sync.fetchAgentVertical(c.id),
+      Sync.fetchAgentDayRecords(c.id, from, to),
+    ]);
+    const el = $('dr-result'); if (!el) return; // sheet may have closed while loading
+
+    const v = Data.VERTICALS[vertical] || Data.VERTICALS.realestate;
+    const byDay = {}; records.forEach((r) => { byDay[r.day] = r; });
+    const metrics = {}; v.activity.forEach((m) => { metrics[m.key] = 0; });
+    const outcomes = {}; v.outcomes.forEach((o) => { outcomes[o.key] = 0; });
+    let loggedDays = 0, totalDays = 0, k = from;
+    while (k <= to) {
+      totalDays++;
+      const rec = byDay[k];
+      if (rec && rec.logged) {
+        loggedDays++;
+        v.activity.forEach((m) => { metrics[m.key] += (rec.numbers && rec.numbers[m.key]) || 0; });
+        v.outcomes.forEach((o) => { outcomes[o.key] += (rec.outcomes && rec.outcomes[o.key]) || 0; });
+      }
+      k = S.addDays(k, 1);
+    }
+
+    el.innerHTML = `
+      <p class="subtle" style="margin:0 0 10px">${loggedDays}/${totalDays} days logged · ${UI.esc(S.fmtShort(from))} – ${UI.esc(S.fmtShort(to))}</p>
+      <div class="section-title">Activity</div>
+      ${v.activity.map((m) => UI.reportRow(m.label, metrics[m.key], null)).join('')}
+      <div class="section-title" style="margin-top:16px">Outcomes</div>
+      ${v.outcomes.map((o) => UI.reportRow(o.label, outcomes[o.key], null)).join('')}`;
   }
   function buildDailyReportDraft(c) {
     return `Hi ${c.name.split(' ')[0]} — here's your daily rundown.\n\n`

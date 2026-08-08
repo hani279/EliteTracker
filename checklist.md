@@ -58,7 +58,7 @@ Follow-up polish requested directly after the initial Tracker rebuild — record
   - [x] Pulls data for whatever time period is currently selected (Today/WTD/MTD/YTD, matches the Tracker page's own period tabs)
   - [x] Outputs a PDF — via the browser's native print dialog ("Save as PDF"), not a PDF library; a `@media print` stylesheet (already scaffolded in styles.css) hides app chrome and prints only the report
 - [x] Add graphs to the generated report — reuses the same Activity Funnel visual as the Tracker page
-- [ ] Add **Detailed Reports** — a separate, hidden/advanced feature for coaches to pull a custom date range — not built yet
+- [x] Add **Detailed Reports** — a separate, hidden/advanced feature for coaches to pull a custom date range. Deliberately buried (Clients → an agent → ghost "Detailed report (custom date range)" button, not a nav tab) and deliberately simple — raw activity/outcome totals over any From/To range, no target/pace math (a target is a daily figure; turning it into a fair total over an arbitrary range would mean re-deriving workdays-in-range like intelligence.js's aggregate() does, out of scope for what's meant to stay a raw pull). New `Sync.fetchAgentVertical` / `Sync.fetchAgentDayRecords`, relying on the existing coach-read RLS on `day_records` and `profiles` — no migration needed. Verified end-to-end against the live database: logged real numbers as an agent, confirmed the coach's report aggregated them correctly (including outcomes) through the real UI, and confirmed the invalid-range guard (From after To) doesn't crash or corrupt the display.
 
 ## Automated daily coach summary
 

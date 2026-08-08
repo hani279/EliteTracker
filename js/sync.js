@@ -413,8 +413,31 @@
     return data && data.signedUrl;
   }
 
+  // ---------- coach: Detailed Reports (custom date range) ----------
+  // Relies on the existing "coach reads linked agent day_records" /
+  // "...profiles" RLS policies (0001_init.sql) — no new policy needed,
+  // and unlike pullRoster() (60-day window, numbers only, aggregated
+  // into coachRoster for the dashboard) this fetches raw rows for
+  // whatever range the coach actually asks for, outcomes included.
+  async function fetchAgentVertical(agentId) {
+    const c = client();
+    if (!c) return 'realestate';
+    const { data, error } = await c.from('profiles').select('vertical').eq('id', agentId).maybeSingle();
+    if (error) { console.warn('fetch agent vertical failed', error); return 'realestate'; }
+    return (data && data.vertical) || 'realestate';
+  }
+  async function fetchAgentDayRecords(agentId, fromKey, toKey) {
+    const c = client();
+    if (!c) return [];
+    const { data, error } = await c.from('day_records')
+      .select('day, numbers, outcomes, logged')
+      .eq('profile_id', agentId).gte('day', fromKey).lte('day', toKey);
+    if (error) { console.warn('fetch agent day records failed', error); return []; }
+    return data || [];
+  }
+
   global.Sync = {
     push, pull, refreshRoster, sendCoachMessage, fetchInbox, markMessageRead, fetchSentReports, fetchCoachNote, saveCoachNote,
-    fetchAgentVoiceNotes, getVoiceNoteSignedUrl,
+    fetchAgentVoiceNotes, getVoiceNoteSignedUrl, fetchAgentVertical, fetchAgentDayRecords,
   };
 })(window);

@@ -826,5 +826,6 @@
     get clientSort() { return clientSort; }, set clientSort(v) { clientSort = v; },
     get onbTmp() { return onbTmp; },
     captureOnb, finishOnboarding, clearOnbDraft, initials, esc, money, sparkline, effectiveMode,
+    reportRow, paceColor,
   };
 })(window);
