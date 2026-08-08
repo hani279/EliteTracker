@@ -398,7 +398,7 @@
   // pass. No AI-generated copy, Auto Nudge, or Predictive Plan here
   // anymore — that read is the coach's job, not the app's.
   let trackerPeriod = 'wtd';
-  const FUNNEL_TITLES = { today: 'Daily Funnel', wtd: 'Weekly Funnel', mtd: 'Monthly Funnel', ytd: 'Yearly Funnel' };
+  const FUNNEL_TITLES = { today: 'Daily Funnel', wtd: 'Weekly Funnel', mtd: 'Monthly Funnel', qtd: 'Quarterly Funnel', ytd: 'Yearly Funnel' };
   function viewToday() {
     const s = S.get(); const day = S.dayRecord(S.todayKey());
     const defs = Data.activityDefs();
@@ -406,7 +406,7 @@
     const doneFocus = day.focus.filter((f) => f.done).length;
     const agg = Intel.aggregate(Intel.rangeKeysToDate(trackerPeriod));
     const conv = Intel.conversions(agg);
-    const periods = [['today', 'Today'], ['wtd', 'This week'], ['mtd', 'This month'], ['ytd', 'This year']];
+    const periods = [['today', 'Today'], ['wtd', 'This week'], ['mtd', 'This month'], ['qtd', 'This quarter'], ['ytd', 'This year']];
 
     return `
     <section class="screen active">
@@ -457,7 +457,7 @@
     const s = S.get(); const v = Data.vertical();
     const period = trackerPeriod;
     const agg = Intel.aggregate(Intel.rangeKeysToDate(period));
-    const periods = [['today', 'Today'], ['wtd', 'This week'], ['mtd', 'This month'], ['ytd', 'This year']];
+    const periods = [['today', 'Today'], ['wtd', 'This week'], ['mtd', 'This month'], ['qtd', 'This quarter'], ['ytd', 'This year']];
     return `<section class="screen active">
       <div class="btn-row" style="margin-bottom:16px">
         <button class="btn outline sm" data-act="nav:today">‹ Back</button>

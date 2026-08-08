@@ -35,7 +35,7 @@
   // Distinct from rangeKeys' rolling N-day windows above — these start at
   // the calendar boundary (Monday, the 1st, Jan 1) and run through today,
   // per the simplified Tracker page's standardized time filters.
-  const TO_DATE_LABELS = { today: 'Today', wtd: 'Week to date', mtd: 'Month to date', ytd: 'Year to date' };
+  const TO_DATE_LABELS = { today: 'Today', wtd: 'Week to date', mtd: 'Month to date', qtd: 'Quarter to date', ytd: 'Year to date' };
   function rangeKeysToDate(type, ref) {
     ref = ref || S.todayKey();
     const refDate = S.parseKey(ref);
@@ -45,6 +45,7 @@
       const dow = start.getDay(); // 0=Sun..6=Sat
       start.setDate(start.getDate() - (dow === 0 ? 6 : dow - 1)); // back to Monday
     } else if (type === 'mtd') start = new Date(refDate.getFullYear(), refDate.getMonth(), 1);
+    else if (type === 'qtd') start = new Date(refDate.getFullYear(), Math.floor(refDate.getMonth() / 3) * 3, 1);
     else if (type === 'ytd') start = new Date(refDate.getFullYear(), 0, 1);
     else start = new Date(refDate); // 'today'
 

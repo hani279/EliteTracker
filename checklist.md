@@ -26,8 +26,8 @@ Goal: strip the app down to a simple "tick, tick, tick" daily-tracking MVP. Cut 
 - [x] "Log today's numbers" as a clear header/section
 - [x] Color-coded progress bar per metric — Red / Orange / Green
 - [x] Replace current activity view with the Activity Funnel
-- [ ] ~~Funnel views: Weekly / Monthly / Quarterly (+ YTD)~~ — unified with the system-wide filter below instead of a separate set; flag if Quarterly specifically is still wanted alongside it
-- [x] System-wide time filters standardized to: **Today, Week to Date, Month to Date, Year to Date**
+- [x] ~~Funnel views: Weekly / Monthly / Quarterly (+ YTD)~~ — unified with the system-wide filter below instead of a separate set. Quarterly was confirmed still wanted and added 2026-08-09: `Intel.rangeKeysToDate('qtd', ...)` (calendar-quarter start, Jan/Apr/Jul/Oct 1), "This quarter" tab, "Quarterly Funnel" title. Verified all four quarter boundaries compute correctly.
+- [x] System-wide time filters standardized to: **Today, This week, This month, This quarter, This year** (relabeled from Week/Month/Year to date per user request, "This quarter" added afterward)
 - [ ] ~~Small Goals section at the bottom of the page~~ — added, then removed at the user's request; Goals is still reachable from the menu, just not previewed on the Tracker page anymore
 - [x] Remove AI-generated copy (e.g. "Calls are your biggest gap…") — that's the coach's job, not the app's
 - [x] Disable Auto Nudge (no AI API key — avoid the added complexity)
